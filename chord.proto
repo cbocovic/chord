@@ -1,0 +1,7 @@
+package chord
+
+message ChordMsg {
+	required string proto = 1;
+	required string command = 2;
+	repeated uint64 uintargs = 3;
+}

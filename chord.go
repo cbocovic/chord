@@ -24,20 +24,51 @@
 
 package chord
 
+import (
+	"fmt"
+	"github.com/golang/protobuf/proto"
+)
+
+const CHORDMSG byte = 01
+
+//Finger type denoting identifying information about a ChordNode
 type Finger struct {
 	id     uint64
-	ipaddr InternetAddress
+	ipaddr string
 }
 
+//ChordNode type denoting a Chord server. Each server has a predecessor, successor, fingertable
+// containing information about log(N) other nodes in the network, identifier, and InternetAddress.
 type ChordNode struct {
 	predecessor Finger
 	successor   Finger
 	fingerTable [5]Finger
 
 	id     uint64
-	ipaddr InternetAddress
+	ipaddr string
 }
 
-func (c *ChordNode) Join() {
-	return
+func (node *ChordNode) Join(addr string) bool {
+	//TODO: construct protobuf message
+	msg := &chord.ChordMsg{
+		Proto:   proto.String("Chord"),
+		Command: proto.String("join"),
+		Args:    proto.Uint64(node.id),
+	}
+	data, err := proto.Marshall(msg)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+	//TODO: open a connection to addr
+	conn, err := Dial("tcp", addr)
+	if err != nil {
+		//TODO: look up conventions on errors for Go.
+		return false
+	}
+	n, err := conn.Write(data)
+	if err != nil {
+		return false
+	}
+
+	return true
 }

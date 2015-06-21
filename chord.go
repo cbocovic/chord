@@ -26,7 +26,6 @@ package chord
 
 import (
 	"fmt"
-	"github.com/golang/protobuf/proto"
 )
 
 const CHORDMSG byte = 01
@@ -48,17 +47,32 @@ type ChordNode struct {
 	ipaddr string
 }
 
+//Send opens a connection to addr, sends msg, and then returns the
+//reply
+func Send(msg []byte, addr string) (reply string, err Error) {
+
+}
+
+//Lookup returns the address of the ChordNode that is responsible
+//for the key. The procedure begins at the address denoted by start.
+func Lookup(key uint64, start string) (addr string, err Error) {
+
+	//TODO: construct protobuf message
+	msg := lookupMsg(key)
+	reply, err := Send(msg, start)
+	if err != nil {
+		return null, err
+	}
+
+	addr = start
+
+	return
+}
+
+//Join will add a ChordNode to the network from an existing node
+//specified by addr.
 func (node *ChordNode) Join(addr string) bool {
 	//TODO: construct protobuf message
-	msg := &chord.ChordMsg{
-		Proto:   proto.String("Chord"),
-		Command: proto.String("join"),
-		Args:    proto.Uint64(node.id),
-	}
-	data, err := proto.Marshall(msg)
-	if err != nil {
-		log.Fatal("marshaling error: ", err)
-	}
 	//TODO: open a connection to addr
 	conn, err := Dial("tcp", addr)
 	if err != nil {

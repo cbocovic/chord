@@ -25,6 +25,7 @@
 package chord
 
 import (
+	"crypto/rand"
 	"fmt"
 )
 
@@ -32,7 +33,7 @@ const CHORDMSG byte = 01
 
 //Finger type denoting identifying information about a ChordNode
 type Finger struct {
-	id     uint64
+	id     [32]byte
 	ipaddr string
 }
 
@@ -43,14 +44,27 @@ type ChordNode struct {
 	successor   Finger
 	fingerTable [5]Finger
 
-	id     uint64
+	id     [32]byte
 	ipaddr string
+
+	//channels for listener/processor/network maintenance routines
+	listener    chan string
+	maintenance chan string
 }
 
 //Send opens a connection to addr, sends msg, and then returns the
 //reply
 func Send(msg []byte, addr string) (reply string, err Error) {
 
+	conn, err := Dial("tcp", addr)
+	if err != nil {
+		//TODO: look up conventions on errors for Go.
+		return nil
+	}
+	n, err := conn.Write(msg)
+	if err != nil {
+		return nil
+	}
 }
 
 //Lookup returns the address of the ChordNode that is responsible
@@ -69,20 +83,20 @@ func Lookup(key uint64, start string) (addr string, err Error) {
 	return
 }
 
+//Create will start a new Chord ring and return the original ChordNode
+func Create() *ChordNode {
+	node := new(ChordNode)
+	return &node
+}
+
 //Join will add a ChordNode to the network from an existing node
 //specified by addr.
-func (node *ChordNode) Join(addr string) bool {
-	//TODO: construct protobuf message
-	//TODO: open a connection to addr
-	conn, err := Dial("tcp", addr)
-	if err != nil {
-		//TODO: look up conventions on errors for Go.
-		return false
-	}
-	n, err := conn.Write(data)
-	if err != nil {
-		return false
-	}
+func Join(addr string) *ChordNode {
+	node := new(ChordNode)
+	//TODO:set up identifier
 
-	return true
+	//TODO:set up listener
+	//TODO:set up maintenance
+	//TODO:lookup id in ring
+	return node
 }

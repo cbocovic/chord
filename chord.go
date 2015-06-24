@@ -52,21 +52,6 @@ type ChordNode struct {
 	maintenance chan string
 }
 
-//Send opens a connection to addr, sends msg, and then returns the
-//reply
-func Send(msg []byte, addr string) (reply string, err Error) {
-
-	conn, err := Dial("tcp", addr)
-	if err != nil {
-		//TODO: look up conventions on errors for Go.
-		return nil
-	}
-	n, err := conn.Write(msg)
-	if err != nil {
-		return nil
-	}
-}
-
 //Lookup returns the address of the ChordNode that is responsible
 //for the key. The procedure begins at the address denoted by start.
 func Lookup(key uint64, start string) (addr string, err Error) {

@@ -13,6 +13,22 @@ func checkError(err error) {
 	}
 }
 
+//Send opens a connection to addr, sends msg, and then returns the
+//reply
+func Send(msg []byte, addr string) (reply string, err Error) {
+
+	conn, err := Dial("tcp", addr)
+	if err != nil {
+		//TODO: look up conventions on errors for Go.
+		return nil
+	}
+	n, err := conn.Write(msg)
+	if err != nil {
+		return nil
+	}
+}
+
+//Listens at an address for incoming messages
 func Listen(addr string) {
 	fmt.Printf("Started ProtoBuf Server")
 	c := make(chan *ChordMsg)
@@ -53,8 +69,4 @@ func handleMessage(conn net.Conn, c chan *ChordMsg) {
 	checkError(err)
 
 	c <- protodata
-}
-
-func parseMessage(msg *ChordMsg) {
-
 }

@@ -1,7 +1,35 @@
 package chord
 
-message ChordMsg {
-	required string proto = 1;
-	required string command = 2;
-	repeated uint64 uintargs = 3;
+message FingerMessage {
+	required string address = 1;
+	required uint64 id = 2;
+}
+
+message ClaimPredMessage {
+	required FingerMessage pred = 1;
+}
+
+message SendFingerMessage {
+	repeated FingerMessage fingers = 1;
+}
+
+message NetworkMessage {
+	required uint32 proto = 1;
+	optional ChordMessage = 2;
+
+	enum Command {
+		Ping = 0;
+		Pong = 1;
+		GetPred = 2;
+		GetId = 3;
+		GetFingers = 4;
+		ClaimPred = 5;
+	}
+
+	message ChordMessage {
+		required Command cmd = 1;
+		optional ClaimPredMessage cpmsg = 2;
+		optional SendFingerMessage = 3;
+	}
+
 }

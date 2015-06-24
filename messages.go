@@ -13,9 +13,7 @@ import (
 func lookupMsg(uint64 key) []byte {
 
 	msg := &chord.ChordMsg{
-		Proto:   proto.String("Chord"),
-		Command: proto.String("join"),
-		Args:    proto.Uint64(node.id),
+		Proto: proto.Uint32(1),
 	}
 	data, err := proto.Marshall(msg)
 	if err != nil {
@@ -23,5 +21,27 @@ func lookupMsg(uint64 key) []byte {
 	}
 
 	return data
+
+}
+
+func parseMessage(msg *NetworkMessage) {
+
+	protocol := msg.GetProto()
+	if protocol != 0 {
+		//TODO: implement callbacks for applications. For now just returns
+		return
+	}
+
+	//TODO: Implement a switch statement that checks to see what kind of message it is (only need to
+	//handle commands)
+	msg = msg.GetChordMessage()
+	cmd = msg.GetCmd()
+	switch {
+	case cmd == Ping:
+	case cmd == GetPred:
+	case cmd == GetId:
+	case cmd == GetFingers:
+	case cmd == ClaimPred:
+	}
 
 }

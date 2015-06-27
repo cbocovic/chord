@@ -1,21 +1,25 @@
-package chord
+package chord;
+
+message SendIdMessage {
+	required string id = 1;
+}
 
 message FingerMessage {
 	required string address = 1;
-	required uint64 id = 2;
+	required string id = 2;
 }
 
 message ClaimPredMessage {
 	required FingerMessage pred = 1;
 }
 
-message SendFingerMessage {
+message SendFingersMessage {
 	repeated FingerMessage fingers = 1;
 }
 
 message NetworkMessage {
 	required uint32 proto = 1;
-	optional ChordMessage = 2;
+	optional ChordMessage msg = 2;
 
 	enum Command {
 		Ping = 0;
@@ -24,12 +28,14 @@ message NetworkMessage {
 		GetId = 3;
 		GetFingers = 4;
 		ClaimPred = 5;
-	}
+	};
 
 	message ChordMessage {
 		required Command cmd = 1;
 		optional ClaimPredMessage cpmsg = 2;
-		optional SendFingerMessage = 3;
+		optional SendFingerMessage sfmsg = 3;
+		optional SendIdMessage sidmsg = 4;
+		optional SendFingersMessage sfmsg = 5;
 	}
 
 }

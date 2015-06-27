@@ -3,5 +3,5 @@ package main
 import "fmt"
 
 func main() {
-	myNode := &ChordNode{}
+	//send a ping to a chord server
 }

@@ -26,6 +26,7 @@ package chord
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 )
 
@@ -42,46 +43,77 @@ type Finger struct {
 type ChordNode struct {
 	predecessor Finger
 	successor   Finger
-	fingerTable [5]Finger
+	fingerTable [256]Finger
 
-	id     [32]byte
-	ipaddr string
+	id [32]byte
+}
 
-	//channels for listener/processor/network maintenance routines
-	listener    chan string
-	maintenance chan string
+//error checking function
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		os.Exit(1)
+	}
 }
 
 //Lookup returns the address of the ChordNode that is responsible
 //for the key. The procedure begins at the address denoted by start.
 func Lookup(key uint64, start string) (addr string, err Error) {
 
-	//TODO: construct protobuf message
-	msg := lookupMsg(key)
+	addr = start
+
+	msg := getfingersMsg(key)
 	reply, err := Send(msg, start)
 	if err != nil {
 		return null, err
 	}
+	ft, err := parseFingers(reply)
+	checkError(err)
 
-	addr = start
+	//loop through finger table and see what the closest finger is
+	for i := ft.len; i > 0; i-- {
+
+	}
 
 	return
 }
 
 //Create will start a new Chord ring and return the original ChordNode
-func Create() *ChordNode {
+func Create(myaddr string) *ChordNode {
 	node := new(ChordNode)
+	//create id by hashing ipaddr
+	node.id = sha256.Sum256([]byte(myaddr))
+	fmt.Printf("Created node with id: %x\n", node.id)
+	listen()
+	node.maintain()
 	return &node
 }
 
 //Join will add a ChordNode to the network from an existing node
 //specified by addr.
-func Join(addr string) *ChordNode {
-	node := new(ChordNode)
-	//TODO:set up identifier
+func Join(myaddr string, addr string) *ChordNode {
+	node := Create(myaddr)
 
-	//TODO:set up listener
-	//TODO:set up maintenance
-	//TODO:lookup id in ring
+	//lookup id in ring
+	successor, err := Lookup(node.id, addr)
+	checkError(err)
+
+	//find id of node
+	msg := getidMsg()
+	reply, err := Send(msg, successor)
+	checkError(err)
+
+	//update node info to include successor
+	succ := new(Finger)
+	succ.id = reply
+	succ.ipaddr = sucessor
+	node.sucessor = succ
+	node.fingers[0] = succ
+
 	return node
+}
+
+//maintain will periodically perform maintenance operations
+func (node *ChordNode) maintain() {
+
 }

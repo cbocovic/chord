@@ -15,7 +15,7 @@ func checkError(err error) {
 
 //Send opens a connection to addr, sends msg, and then returns the
 //reply
-func Send(msg []byte, addr string) (reply string, err Error) {
+func send(msg []byte, addr string) (reply string, err Error) {
 
 	conn, err := Dial("tcp", addr)
 	if err != nil {
@@ -29,13 +29,14 @@ func Send(msg []byte, addr string) (reply string, err Error) {
 }
 
 //Listens at an address for incoming messages
-func Listen(addr string) {
+func (node *ChordNode) listen(addr string) {
 	fmt.Printf("Started ProtoBuf Server")
-	c := make(chan *ChordMsg)
+	c := make(chan []byte)
+	c2 := make(chan []byte)
 	go func() {
 		for {
 			message := <-c
-			parseMessage(message)
+			node.parseMessage(message, c2)
 		}
 	}()
 
@@ -44,29 +45,32 @@ func Listen(addr string) {
 	checkError(err)
 	for {
 		if conn, err := listener.Accept(); err == nil {
-			go handleMessage(conn, c)
+			go handleMessage(conn, c, c2)
 		} else {
 			continue
 		}
 	}
 }
 
-func handleMessage(conn net.Conn, c chan *ChordMsg) {
+func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 	fmt.Println("Connection Established")
 
 	//Close conenction when function exits
 	defer conn.Close()
 
-	//Create data buffer of type byte slice (why 4096 bytes???)
-	data := make([]byte, 4096)
+	//Create data buffer of type byte slice
+	data := make([]byte, 4096) //TODO: use framing here
 	n, err := conn.Read(data)
 	checkError(err)
 	fmt.Println("Decoding Protobuf message")
 
-	protodata := new(ChordMsg)
+	c <- data
 
-	err = proto.Unmarshal(data[0:n], protodata)
-	checkError(err)
+	//wait for message to come back
+	response := <-c2
 
-	c <- protodata
+	n, err := conn.Write(response)
+	if err != nil {
+		return nil
+	}
 }

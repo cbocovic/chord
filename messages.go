@@ -174,3 +174,35 @@ func parseFingers(data []byte) (ft []Finger, err error) {
 	}
 	return
 }
+
+func parseId(data []byte) (id []byte, err error) {
+	msg := new(NetworkMessage)
+	err := proto.Unmarshall(data, msg)
+	if msg.GetProto() != 0 {
+		//TODO: return non-nil error
+		return
+	}
+	msg := msg.GetMsg()
+	msg := msg.GetSidmsg()
+	id = msg.GetId()
+	return
+}
+
+func parsePong(data []byte) (success bool, err error) {
+
+	msg := new(NetworkMessage)
+	err := proto.Unmarshall(data, msg)
+	if msg.GetProto() != 0 {
+		//TODO: return non-nil error
+		return
+	}
+	msg := msg.GetMsg()
+	command := msg.GetCmd()
+	if command == NetworkMessage_Pong {
+		success = true
+	} else {
+		success = false
+	}
+
+	return
+}

@@ -28,6 +28,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"math/big"
 )
 
 const CHORDMSG byte = 01
@@ -58,7 +59,7 @@ func checkError(err error) {
 
 //Lookup returns the address of the ChordNode that is responsible
 //for the key. The procedure begins at the address denoted by start.
-func Lookup(key uint64, start string) (addr string, err Error) {
+func Lookup(key [32]byte, start string) (addr string, err Error) {
 
 	addr = start
 
@@ -71,8 +72,14 @@ func Lookup(key uint64, start string) (addr string, err Error) {
 	checkError(err)
 
 	//loop through finger table and see what the closest finger is
-	for i := ft.len; i > 0; i-- {
-
+	for i := ft.len - 1; i > 0; i-- {
+		f := ft[i]
+		if i == 0 {
+			break
+		}
+		if inRange(f.id, ft[0].id, key) {
+			return Lookup(key, ft[i].ip)
+		}
 	}
 
 	return
@@ -116,4 +123,27 @@ func Join(myaddr string, addr string) *ChordNode {
 //maintain will periodically perform maintenance operations
 func (node *ChordNode) maintain() {
 
+}
+
+//inRange checks to see if the value x is in (min, max)
+func inRange(x []byte, min []byte, max []byte) bool {
+	//There are 3 cases: min < x and x < max,
+	//x < max and max < min, max < min and min < x
+	xint := big.SetBytes(x)
+	minint := big.SetBytes(min)
+	maxint := big.SetBytes(max)
+
+	if xint.Cmp(minint) == 1 && maxint.Cmp(xint) {
+		return true
+	}
+
+	if maxint.Cmp(xint) == 1 && minint.Cmp(maxint) {
+		return true
+	}
+
+	if minint.Cmp(maxint) == 1 && xint.Cmp(minint) {
+		return true
+	}
+
+	return false
 }

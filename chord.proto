@@ -33,7 +33,6 @@ message NetworkMessage {
 	message ChordMessage {
 		required Command cmd = 1;
 		optional ClaimPredMessage cpmsg = 2;
-		optional SendFingerMessage sfmsg = 3;
 		optional SendIdMessage sidmsg = 4;
 		optional SendFingersMessage sfmsg = 5;
 	}

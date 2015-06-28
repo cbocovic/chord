@@ -25,10 +25,10 @@
 package chord
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"os"
 )
 
 const CHORDMSG byte = 01
@@ -59,26 +59,26 @@ func checkError(err error) {
 
 //Lookup returns the address of the ChordNode that is responsible
 //for the key. The procedure begins at the address denoted by start.
-func Lookup(key [32]byte, start string) (addr string, err Error) {
+func Lookup(key [32]byte, start string) (addr string, err error) {
 
 	addr = start
 
-	msg := getfingersMsg(key)
-	reply, err := Send(msg, start)
+	msg := getfingersMsg()
+	reply, err := send(msg, start)
 	if err != nil {
-		return null, err
+		return "", err
 	}
 	ft, err := parseFingers(reply)
 	checkError(err)
 
 	//loop through finger table and see what the closest finger is
-	for i := ft.len - 1; i > 0; i-- {
+	for i := len(ft) - 1; i > 0; i-- {
 		f := ft[i]
 		if i == 0 {
 			break
 		}
 		if inRange(f.id, ft[0].id, key) {
-			return Lookup(key, ft[i].ip)
+			return Lookup(key, f.ipaddr)
 		}
 	}
 
@@ -91,9 +91,9 @@ func Create(myaddr string) *ChordNode {
 	//create id by hashing ipaddr
 	node.id = sha256.Sum256([]byte(myaddr))
 	fmt.Printf("Created node with id: %x\n", node.id)
-	listen()
+	node.listen(myaddr)
 	node.maintain()
-	return &node
+	return node
 }
 
 //Join will add a ChordNode to the network from an existing node
@@ -107,15 +107,15 @@ func Join(myaddr string, addr string) *ChordNode {
 
 	//find id of node
 	msg := getidMsg()
-	reply, err := Send(msg, successor)
+	reply, err := send(msg, successor)
 	checkError(err)
 
 	//update node info to include successor
 	succ := new(Finger)
-	succ.id = reply
-	succ.ipaddr = sucessor
-	node.sucessor = succ
-	node.fingers[0] = succ
+	succ.id, _ = parseId(reply)
+	succ.ipaddr = successor
+	node.successor = *succ
+	node.fingerTable[0] = *succ
 
 	return node
 }
@@ -126,7 +126,7 @@ func (node *ChordNode) maintain() {
 }
 
 //inRange checks to see if the value x is in (min, max)
-func inRange(x []byte, min []byte, max []byte) bool {
+func inRange(x [32]byte, min [32]byte, max [32]byte) bool {
 	//There are 3 cases: min < x and x < max,
 	//x < max and max < min, max < min and min < x
 	xint := big.SetBytes(x)

@@ -3,29 +3,30 @@ package chord
 import (
 	"fmt"
 	"net"
-	"os"
 )
-
-func checkError(err error) {
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		os.Exit(1)
-	}
-}
 
 //Send opens a connection to addr, sends msg, and then returns the
 //reply
-func send(msg []byte, addr string) (reply string, err Error) {
+func send(msg []byte, addr string) (reply []byte, err error) {
 
-	conn, err := Dial("tcp", addr)
+	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		//TODO: look up conventions on errors for Go.
-		return nil
+		return
 	}
 	n, err := conn.Write(msg)
 	if err != nil {
-		return nil
+		return
 	}
+
+	reply = make([]byte, 4096) //TODO: use framing here
+	n, err = conn.Read(reply)
+	if err != nil {
+		return
+	}
+
+	return
+
 }
 
 //Listens at an address for incoming messages
@@ -69,8 +70,8 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 	//wait for message to come back
 	response := <-c2
 
-	n, err := conn.Write(response)
+	n, err = conn.Write(response)
 	if err != nil {
-		return nil
+		return
 	}
 }

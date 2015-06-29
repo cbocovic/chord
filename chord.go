@@ -92,7 +92,7 @@ func Create(myaddr string) *ChordNode {
 	node.id = sha256.Sum256([]byte(myaddr))
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
-	node.maintain()
+	node.Maintain()
 	return node
 }
 
@@ -121,7 +121,8 @@ func Join(myaddr string, addr string) *ChordNode {
 }
 
 //maintain will periodically perform maintenance operations
-func (node *ChordNode) maintain() {
+//TODO: make unexported
+func (node *ChordNode) Maintain() {
 
 }
 

@@ -18,8 +18,6 @@
  *		Receiver functions:
  *			* join(id ulong, node InternetAddress) - joins the DHT with the identifier id by
  *					contacting
-
-
  */
 
 package chord

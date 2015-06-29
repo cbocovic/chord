@@ -129,19 +129,22 @@ func (node *ChordNode) maintain() {
 func inRange(x [32]byte, min [32]byte, max [32]byte) bool {
 	//There are 3 cases: min < x and x < max,
 	//x < max and max < min, max < min and min < x
-	xint := big.SetBytes(x)
-	minint := big.SetBytes(min)
-	maxint := big.SetBytes(max)
+	xint := new(big.Int)
+	maxint := new(big.Int)
+	minint := new(big.Int)
+	xint.SetBytes(x[:32])
+	minint.SetBytes(min[:32])
+	maxint.SetBytes(max[:32])
 
-	if xint.Cmp(minint) == 1 && maxint.Cmp(xint) {
+	if xint.Cmp(minint) == 1 && maxint.Cmp(xint) == 1 {
 		return true
 	}
 
-	if maxint.Cmp(xint) == 1 && minint.Cmp(maxint) {
+	if maxint.Cmp(xint) == 1 && minint.Cmp(maxint) == 1 {
 		return true
 	}
 
-	if minint.Cmp(maxint) == 1 && xint.Cmp(minint) {
+	if minint.Cmp(maxint) == 1 && xint.Cmp(minint) == 1 {
 		return true
 	}
 

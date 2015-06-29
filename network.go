@@ -14,13 +14,13 @@ func send(msg []byte, addr string) (reply []byte, err error) {
 		//TODO: look up conventions on errors for Go.
 		return
 	}
-	n, err := conn.Write(msg)
+	_, err = conn.Write(msg)
 	if err != nil {
 		return
 	}
 
 	reply = make([]byte, 4096) //TODO: use framing here
-	n, err = conn.Read(reply)
+	_, err = conn.Read(reply)
 	if err != nil {
 		return
 	}
@@ -61,7 +61,7 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 
 	//Create data buffer of type byte slice
 	data := make([]byte, 4096) //TODO: use framing here
-	n, err := conn.Read(data)
+	_, err := conn.Read(data)
 	checkError(err)
 	fmt.Println("Decoding Protobuf message")
 
@@ -70,7 +70,7 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 	//wait for message to come back
 	response := <-c2
 
-	n, err = conn.Write(response)
+	_, err = conn.Write(response)
 	if err != nil {
 		return
 	}

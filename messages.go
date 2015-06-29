@@ -37,7 +37,7 @@ func sendfingersMsg(fingers []Finger) []byte {
 	sfMsg := new(SendFingersMessage)
 	for _, finger := range fingers {
 		fingerMsg := new(FingerMessage)
-		fingerMsg.Id = proto.String(string(finger.id))
+		fingerMsg.Id = proto.String(string(finger.id[:32]))
 		fingerMsg.Address = proto.String(finger.ipaddr)
 		sfMsg.Fingers = append(sfMsg.Fingers, fingerMsg)
 	}
@@ -178,11 +178,11 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 	case cmd == NetworkMessage_Ping:
 		c <- pongMsg()
 	case cmd == NetworkMessage_GetPred:
-		c <- sendpredMsg(node.predecessor)
+		c <- sendpredMsg() //node.predecessor)
 	case cmd == NetworkMessage_GetId:
-		c <- sendidMsg(node.id)
+		c <- sendidMsg(node.id[:32])
 	case cmd == NetworkMessage_GetFingers:
-		c <- sendfingersMsg(node.fingerTable)
+		c <- sendfingersMsg(node.fingerTable[:32])
 	case cmd == NetworkMessage_ClaimPred:
 		//update finger table
 
@@ -202,7 +202,10 @@ func parseFingers(data []byte) (ft []Finger, err error) {
 	sfmsg := chordmsg.GetSfmsg()
 	fingers := sfmsg.GetFingers()
 	for _, finger := range fingers {
-		ft = append(ft, finger)
+		newfinger := new(Finger)
+		copy(newfinger.id[:], []byte(*finger.Id))
+		newfinger.ipaddr = *finger.Address
+		ft = append(ft, *newfinger)
 	}
 	return
 }

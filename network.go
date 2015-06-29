@@ -8,6 +8,7 @@ import (
 //Send opens a connection to addr, sends msg, and then returns the
 //reply
 func send(msg []byte, addr string) (reply []byte, err error) {
+	fmt.Printf("Sending message to %s.\n", addr)
 
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -31,7 +32,7 @@ func send(msg []byte, addr string) (reply []byte, err error) {
 
 //Listens at an address for incoming messages
 func (node *ChordNode) listen(addr string) {
-	fmt.Printf("Started ProtoBuf Server")
+	fmt.Printf("Chord node %x is listening on %s...\n", node.id, addr)
 	c := make(chan []byte)
 	c2 := make(chan []byte)
 	go func() {
@@ -44,17 +45,19 @@ func (node *ChordNode) listen(addr string) {
 	//listen to TCP port
 	listener, err := net.Listen("tcp", addr)
 	checkError(err)
-	for {
-		if conn, err := listener.Accept(); err == nil {
-			go handleMessage(conn, c, c2)
-		} else {
-			continue
+	go func() {
+		for {
+			if conn, err := listener.Accept(); err == nil {
+				go handleMessage(conn, c, c2)
+			} else {
+				continue
+			}
 		}
-	}
+	}()
 }
 
 func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
-	fmt.Println("Connection Established")
+	fmt.Printf("Connection established.\n")
 
 	//Close conenction when function exits
 	defer conn.Close()
@@ -63,7 +66,6 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 	data := make([]byte, 4096) //TODO: use framing here
 	_, err := conn.Read(data)
 	checkError(err)
-	fmt.Println("Decoding Protobuf message")
 
 	c <- data
 

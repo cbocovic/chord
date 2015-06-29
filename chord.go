@@ -92,7 +92,9 @@ func Create(myaddr string) *ChordNode {
 	node.id = sha256.Sum256([]byte(myaddr))
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
-	node.Maintain()
+	fmt.Printf("Test\n")
+	go node.Maintain()
+	fmt.Printf("Exiting create.\n")
 	return node
 }
 
@@ -101,7 +103,7 @@ func Create(myaddr string) *ChordNode {
 func Join(myaddr string, addr string) *ChordNode {
 	node := Create(myaddr)
 
-	//lookup id in ring
+	/*lookup id in ring
 	successor, err := Lookup(node.id, addr)
 	checkError(err)
 
@@ -116,6 +118,13 @@ func Join(myaddr string, addr string) *ChordNode {
 	succ.ipaddr = successor
 	node.successor = *succ
 	node.fingerTable[0] = *succ
+	*/
+	//TODO: remove after testing
+	msg := pingMsg()
+	reply, err := send(msg, addr)
+	checkError(err)
+
+	fmt.Printf(string(reply))
 
 	return node
 }
@@ -123,7 +132,14 @@ func Join(myaddr string, addr string) *ChordNode {
 //maintain will periodically perform maintenance operations
 //TODO: make unexported
 func (node *ChordNode) Maintain() {
+	fmt.Printf("Maintaining...\n")
+	for {
+		x := 1
+		if x == 0 {
+			x = 1
+		}
 
+	}
 }
 
 //inRange checks to see if the value x is in (min, max)

@@ -6,6 +6,7 @@
 package chord
 
 import (
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"log"
 )
@@ -176,6 +177,7 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 	cmd := chordmsg.GetCmd()
 	switch {
 	case cmd == NetworkMessage_Ping:
+		fmt.Println("Node %s received ping.\n", node.id)
 		c <- pongMsg()
 	case cmd == NetworkMessage_GetPred:
 		c <- sendpredMsg() //node.predecessor)

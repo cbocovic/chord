@@ -22,6 +22,8 @@ func main() {
 		me = chord.Join(*addressPtr, *joinPtr)
 	}
 	fmt.Printf("My address is: %s.\n", *addressPtr)
+	for {
+	}
 	me.Maintain()
 
 }

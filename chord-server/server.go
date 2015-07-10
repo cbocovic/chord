@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/cbocovic/chord"
+	"io"
 )
 
 func main() {
@@ -22,8 +23,15 @@ func main() {
 		me = chord.Join(*addressPtr, *joinPtr)
 	}
 	fmt.Printf("My address is: %s.\n", *addressPtr)
+	//block until receive input
 	for {
+		var c int
+		c, err := fmt.Scan(&c)
+		if err == io.EOF {
+			break
+		}
+
 	}
-	me.Maintain()
+	me.Finalize()
 
 }

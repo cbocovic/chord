@@ -27,9 +27,8 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"time"
 )
-
-const CHORDMSG byte = 01
 
 //Finger type denoting identifying information about a ChordNode
 type Finger struct {
@@ -40,8 +39,8 @@ type Finger struct {
 //ChordNode type denoting a Chord server. Each server has a predecessor, successor, fingertable
 // containing information about log(N) other nodes in the network, identifier, and InternetAddress.
 type ChordNode struct {
-	predecessor Finger
-	successor   Finger
+	predecessor *Finger
+	successor   *Finger
 	fingerTable [256]Finger
 
 	id [32]byte
@@ -91,7 +90,7 @@ func Create(myaddr string) *ChordNode {
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
 	fmt.Printf("Test\n")
-	go node.Maintain()
+	go node.maintain()
 	fmt.Printf("Exiting create.\n")
 	return node
 }
@@ -100,8 +99,8 @@ func Create(myaddr string) *ChordNode {
 //specified by addr.
 func Join(myaddr string, addr string) *ChordNode {
 	node := Create(myaddr)
+	fmt.Printf("Finished creating node. Now to join...\n")
 
-	/*lookup id in ring
 	successor, err := Lookup(node.id, addr)
 	checkError(err)
 
@@ -113,31 +112,76 @@ func Join(myaddr string, addr string) *ChordNode {
 	//update node info to include successor
 	succ := new(Finger)
 	succ.id, _ = parseId(reply)
+	fmt.Printf("Found successor: %x.\n", succ.id)
 	succ.ipaddr = successor
-	node.successor = *succ
+	node.successor = succ
 	node.fingerTable[0] = *succ
-	*/
+
 	//TODO: remove after testing
-	msg := pingMsg()
-	reply, err := send(msg, addr)
-	checkError(err)
+	//msg := pingMsg()
 
-	fmt.Printf(string(reply))
+	//reply, err := send(msg, addr)
+	//checkError(err)
 
+	//if succ, err := parsePong(reply); succ == true && err == nil {
+	//	fmt.Printf("Successfully joined!\n")
+	//} else {
+	//	fmt.Printf("Fail!\n")
+	//}
 	return node
 }
 
 //maintain will periodically perform maintenance operations
-//TODO: make unexported
-func (node *ChordNode) Maintain() {
+func (node *ChordNode) maintain() {
 	fmt.Printf("Maintaining...\n")
 	for {
-		x := 1
-		if x == 0 {
-			x = 1
+		//stabilize
+		node.stabilize()
+		time.Sleep(5 * time.Second)
+		//check predecessor
+		//update fingers
+	}
+}
+
+//stablize ensures that the node's successor's predecessor is itself
+//If not, it updates its successor's predecessor.
+func (node *ChordNode) stabilize() {
+	//check to see if successor is still around
+	if node.successor == nil {
+		fmt.Printf("don't know own successor.\n")
+		return
+	}
+
+	//ask sucessor for predecessor
+	msg := getpredMsg()
+	reply, err := send(msg, node.successor.ipaddr)
+	checkError(err)
+
+	ft, err := parseFingers(reply)
+	checkError(err)
+	predOfSucc := ft[0]
+
+	if predOfSucc.id != node.id {
+		//something should be updated
+		if inRange(predOfSucc.id, node.id, node.successor.id) {
+			*node.successor = predOfSucc
 		}
 
+		//claim to be predecessor of succ
 	}
+
+}
+
+func (node *ChordNode) checkPred() {
+
+}
+
+func (node *ChordNode) updateFingers() {
+
+}
+
+func (node *ChordNode) Finalize() {
+	fmt.Printf("Exiting...\n")
 }
 
 //inRange checks to see if the value x is in (min, max)

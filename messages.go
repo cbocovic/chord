@@ -18,7 +18,8 @@ func getfingersMsg() []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 	chordMsg := new(NetworkMessage_ChordMessage)
-	*chordMsg.Cmd = NetworkMessage_GetFingers
+	command := NetworkMessage_Command(NetworkMessage_Command_value["GetFingers"])
+	chordMsg.Cmd = &command
 	msg.Msg = chordMsg
 
 	data, err := proto.Marshal(msg)
@@ -34,7 +35,8 @@ func sendfingersMsg(fingers []Finger) []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 	chordMsg := new(NetworkMessage_ChordMessage)
-	*chordMsg.Cmd = NetworkMessage_GetFingers
+	command := NetworkMessage_Command(NetworkMessage_Command_value["GetFingers"])
+	chordMsg.Cmd = &command
 	sfMsg := new(SendFingersMessage)
 	for _, finger := range fingers {
 		fingerMsg := new(FingerMessage)
@@ -59,7 +61,8 @@ func getidMsg() []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 	chordMsg := new(NetworkMessage_ChordMessage)
-	*chordMsg.Cmd = NetworkMessage_GetId
+	command := NetworkMessage_Command(NetworkMessage_Command_value["GetId"])
+	chordMsg.Cmd = &command
 	msg.Msg = chordMsg
 
 	data, err := proto.Marshal(msg)
@@ -76,7 +79,8 @@ func sendidMsg(id []byte) []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 	chordMsg := new(NetworkMessage_ChordMessage)
-	*chordMsg.Cmd = NetworkMessage_GetId
+	command := NetworkMessage_Command(NetworkMessage_Command_value["GetId"])
+	chordMsg.Cmd = &command
 	sidMsg := new(SendIdMessage)
 	sidMsg.Id = proto.String(string(id))
 	chordMsg.Sidmsg = sidMsg
@@ -95,7 +99,8 @@ func getpredMsg() []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 	chordMsg := new(NetworkMessage_ChordMessage)
-	*chordMsg.Cmd = NetworkMessage_ClaimPred
+	command := NetworkMessage_Command(NetworkMessage_Command_value["GetPred"])
+	chordMsg.Cmd = &command
 	msg.Msg = chordMsg
 
 	data, err := proto.Marshal(msg)
@@ -108,11 +113,18 @@ func getpredMsg() []byte {
 }
 
 //TODO: rewrite
-func sendpredMsg() []byte {
+func sendpredMsg(finger Finger) []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 	chordMsg := new(NetworkMessage_ChordMessage)
-	*chordMsg.Cmd = NetworkMessage_ClaimPred
+	command := NetworkMessage_Command(NetworkMessage_Command_value["GetPred"])
+	chordMsg.Cmd = &command
+	sfMsg := new(SendFingersMessage)
+	fingerMsg := new(FingerMessage)
+	fingerMsg.Id = proto.String(string(finger.id[:32]))
+	fingerMsg.Address = proto.String(finger.ipaddr)
+	sfMsg.Fingers = append(sfMsg.Fingers, fingerMsg)
+	chordMsg.Sfmsg = sfMsg
 	msg.Msg = chordMsg
 
 	data, err := proto.Marshal(msg)
@@ -130,7 +142,8 @@ func pingMsg() []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 	chordMsg := new(NetworkMessage_ChordMessage)
-	*chordMsg.Cmd = NetworkMessage_Ping
+	command := NetworkMessage_Command(NetworkMessage_Command_value["Ping"])
+	chordMsg.Cmd = &command
 	msg.Msg = chordMsg
 
 	data, err := proto.Marshal(msg)
@@ -147,7 +160,8 @@ func pongMsg() []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 	chordMsg := new(NetworkMessage_ChordMessage)
-	*chordMsg.Cmd = NetworkMessage_Pong
+	command := NetworkMessage_Command(NetworkMessage_Command_value["Pong"])
+	chordMsg.Cmd = &command
 	msg.Msg = chordMsg
 
 	data, err := proto.Marshal(msg)
@@ -168,35 +182,41 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 	checkError(err)
 
 	protocol := msg.GetProto()
-	if protocol != 0 {
+	if protocol != 1 {
 		//TODO: implement callbacks for applications. For now just returns
 		return
 	}
 
 	chordmsg := msg.GetMsg()
-	cmd := chordmsg.GetCmd()
+	cmd := int32(chordmsg.GetCmd())
 	switch {
-	case cmd == NetworkMessage_Ping:
-		fmt.Println("Node %s received ping.\n", node.id)
+	case cmd == NetworkMessage_Command_value["Ping"]:
 		c <- pongMsg()
-	case cmd == NetworkMessage_GetPred:
-		c <- sendpredMsg() //node.predecessor)
-	case cmd == NetworkMessage_GetId:
+		return
+	case cmd == NetworkMessage_Command_value["GetPred"]:
+		c <- sendpredMsg(*node.predecessor) //node.predecessor)
+		return
+	case cmd == NetworkMessage_Command_value["GetId"]:
 		c <- sendidMsg(node.id[:32])
-	case cmd == NetworkMessage_GetFingers:
+		return
+	case cmd == NetworkMessage_Command_value["GetFingers"]:
 		c <- sendfingersMsg(node.fingerTable[:32])
-	case cmd == NetworkMessage_ClaimPred:
+		return
+	case cmd == NetworkMessage_Command_value["ClaimPred"]:
 		//update finger table
+		return
 
 	}
+	fmt.Printf("No matching commands.\n")
 }
 
+//parseFingers can be called to return a finger table from a received
 //parseFingers can be called to return a finger table from a received
 //message after a getfingers call.
 func parseFingers(data []byte) (ft []Finger, err error) {
 	msg := new(NetworkMessage)
 	err = proto.Unmarshal(data, msg)
-	if msg.GetProto() != 0 {
+	if msg.GetProto() != 1 {
 		//TODO: return non-nil error
 		return
 	}
@@ -215,7 +235,7 @@ func parseFingers(data []byte) (ft []Finger, err error) {
 func parseId(data []byte) (id [32]byte, err error) {
 	msg := new(NetworkMessage)
 	err = proto.Unmarshal(data, msg)
-	if msg.GetProto() != 0 {
+	if msg.GetProto() != 1 {
 		//TODO: return non-nil error
 		return
 	}
@@ -230,13 +250,17 @@ func parsePong(data []byte) (success bool, err error) {
 
 	msg := new(NetworkMessage)
 	err = proto.Unmarshal(data, msg)
-	if msg.GetProto() != 0 {
+	checkError(err)
+
+	if msg.GetProto() != 1 {
 		//TODO: return non-nil error
+		fmt.Printf("Something went wrong!\n")
 		return
 	}
 	chordmsg := msg.GetMsg()
-	command := chordmsg.GetCmd()
-	if command == NetworkMessage_Pong {
+	command := int32(chordmsg.GetCmd())
+	fmt.Printf("Received: %d, Expected: %d\n", command, NetworkMessage_Command_value["Pong"])
+	if command == NetworkMessage_Command_value["Pong"] {
 		success = true
 	} else {
 		success = false

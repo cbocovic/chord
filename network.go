@@ -11,6 +11,7 @@ func send(msg []byte, addr string) (reply []byte, err error) {
 	fmt.Printf("Sending message to %s.\n", addr)
 
 	conn, err := net.Dial("tcp", addr)
+	checkError(err)
 	if err != nil {
 		//TODO: look up conventions on errors for Go.
 		return
@@ -21,10 +22,11 @@ func send(msg []byte, addr string) (reply []byte, err error) {
 	}
 
 	reply = make([]byte, 4096) //TODO: use framing here
-	_, err = conn.Read(reply)
+	n, err := conn.Read(reply)
 	if err != nil {
 		return
 	}
+	reply = reply[:n]
 
 	return
 
@@ -36,6 +38,7 @@ func (node *ChordNode) listen(addr string) {
 	c := make(chan []byte)
 	c2 := make(chan []byte)
 	go func() {
+		defer fmt.Printf("No longer listening...\n")
 		for {
 			message := <-c
 			node.parseMessage(message, c2)
@@ -46,8 +49,10 @@ func (node *ChordNode) listen(addr string) {
 	listener, err := net.Listen("tcp", addr)
 	checkError(err)
 	go func() {
+		defer fmt.Printf("No longer listening...\n")
 		for {
 			if conn, err := listener.Accept(); err == nil {
+				fmt.Printf("Accepted connection\n")
 				go handleMessage(conn, c, c2)
 			} else {
 				continue
@@ -57,17 +62,19 @@ func (node *ChordNode) listen(addr string) {
 }
 
 func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
-	fmt.Printf("Connection established.\n")
 
 	//Close conenction when function exits
 	defer conn.Close()
 
 	//Create data buffer of type byte slice
 	data := make([]byte, 4096) //TODO: use framing here
-	_, err := conn.Read(data)
+	n, err := conn.Read(data)
+	if n >= 4095 {
+		fmt.Printf("Ran out of buffer room.\n")
+	}
 	checkError(err)
 
-	c <- data
+	c <- data[:n]
 
 	//wait for message to come back
 	response := <-c2

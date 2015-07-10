@@ -22,12 +22,12 @@ message NetworkMessage {
 	optional ChordMessage msg = 2;
 
 	enum Command {
-		Ping = 0;
-		Pong = 1;
-		GetPred = 2;
-		GetId = 3;
-		GetFingers = 4;
-		ClaimPred = 5;
+		Ping = 1;
+		Pong = 2;
+		GetPred = 3;
+		GetId = 4;
+		GetFingers = 5;
+		ClaimPred = 6;
 	};
 
 	message ChordMessage {

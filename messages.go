@@ -136,6 +136,29 @@ func sendpredMsg(finger Finger) []byte {
 	return data
 }
 
+func claimpredMsg(finger Finger) []byte {
+	msg := new(NetworkMessage)
+	msg.Proto = proto.Uint32(1)
+	chordMsg := new(NetworkMessage_ChordMessage)
+	command := NetworkMessage_Command(NetworkMessage_Command_value["ClaimPred"])
+	chordMsg.Cmd = &command
+	sfMsg := new(SendFingersMessage)
+	fingerMsg := new(FingerMessage)
+	fingerMsg.Id = proto.String(string(finger.id[:32]))
+	fingerMsg.Address = proto.String(finger.ipaddr)
+	sfMsg.Fingers = append(sfMsg.Fingers, fingerMsg)
+	chordMsg.Sfmsg = sfMsg
+	msg.Msg = chordMsg
+
+	data, err := proto.Marshal(msg)
+
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+
+	return data
+}
+
 //pingMsg constructs a message to ping a server
 func pingMsg() []byte {
 
@@ -172,6 +195,18 @@ func pongMsg() []byte {
 	return data
 }
 
+func nullMsg() []byte {
+	msg := new(NetworkMessage)
+	msg.Proto = proto.Uint32(1)
+
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+
+	return data
+}
+
 //parseMessage takes as input an unmarshalled protocol buffer and
 //performs actions based on what the message contains.
 func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
@@ -194,7 +229,11 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		c <- pongMsg()
 		return
 	case cmd == NetworkMessage_Command_value["GetPred"]:
-		c <- sendpredMsg(*node.predecessor) //node.predecessor)
+		if node.predecessor == nil {
+			c <- nullMsg()
+		} else {
+			c <- sendpredMsg(*node.predecessor) //node.predecessor)
+		}
 		return
 	case cmd == NetworkMessage_Command_value["GetId"]:
 		c <- sendidMsg(node.id[:32])
@@ -203,6 +242,14 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		c <- sendfingersMsg(node.fingerTable[:32])
 		return
 	case cmd == NetworkMessage_Command_value["ClaimPred"]:
+		//extract finger
+		ft, err := parseFingers(data)
+		checkError(err)
+		newPred := ft[0]
+		if node.predecessor == nil || inRange(newPred.id, node.predecessor.id, node.id) {
+			fmt.Printf("Updating predecessor.\n")
+			node.notify(newPred)
+		}
 		//update finger table
 		return
 
@@ -221,6 +268,9 @@ func parseFingers(data []byte) (ft []Finger, err error) {
 		return
 	}
 	chordmsg := msg.GetMsg()
+	if chordmsg == nil {
+		return
+	}
 	sfmsg := chordmsg.GetSfmsg()
 	fingers := sfmsg.GetFingers()
 	for _, finger := range fingers {

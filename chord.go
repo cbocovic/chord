@@ -43,7 +43,8 @@ type ChordNode struct {
 	successor   *Finger
 	fingerTable [256]Finger
 
-	id [32]byte
+	id     [32]byte
+	ipaddr string
 }
 
 //error checking function
@@ -87,6 +88,7 @@ func Create(myaddr string) *ChordNode {
 	node := new(ChordNode)
 	//create id by hashing ipaddr
 	node.id = sha256.Sum256([]byte(myaddr))
+	node.ipaddr = myaddr
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
 	fmt.Printf("Test\n")
@@ -153,23 +155,38 @@ func (node *ChordNode) stabilize() {
 	}
 
 	//ask sucessor for predecessor
+	fmt.Printf("Asking successor for pred.\n")
 	msg := getpredMsg()
 	reply, err := send(msg, node.successor.ipaddr)
 	checkError(err)
 
 	ft, err := parseFingers(reply)
 	checkError(err)
-	predOfSucc := ft[0]
+	if ft != nil {
+		predOfSucc := ft[0]
 
-	if predOfSucc.id != node.id {
-		//something should be updated
-		if inRange(predOfSucc.id, node.id, node.successor.id) {
-			*node.successor = predOfSucc
+		if predOfSucc.id != node.id {
+			//something should be updated
+			if inRange(predOfSucc.id, node.id, node.successor.id) {
+				*node.successor = predOfSucc
+			}
 		}
-
-		//claim to be predecessor of succ
 	}
 
+	//claim to be predecessor of succ
+	me := new(Finger)
+	me.id = node.id
+	me.ipaddr = node.ipaddr
+	msg = claimpredMsg(*me)
+	send(msg, node.successor.ipaddr)
+
+}
+
+func (node *ChordNode) notify(newPred Finger) {
+	//update predecessor
+	node.predecessor = new(Finger)
+	*node.predecessor = newPred
+	//notify applications
 }
 
 func (node *ChordNode) checkPred() {

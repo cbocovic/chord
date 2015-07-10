@@ -89,6 +89,10 @@ func Create(myaddr string) *ChordNode {
 	//create id by hashing ipaddr
 	node.id = sha256.Sum256([]byte(myaddr))
 	node.ipaddr = myaddr
+	succ := new(Finger)
+	succ.id = node.id
+	succ.ipaddr = node.ipaddr
+	node.successor = succ
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
 	fmt.Printf("Test\n")

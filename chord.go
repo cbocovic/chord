@@ -89,10 +89,10 @@ func Create(myaddr string) *ChordNode {
 	//create id by hashing ipaddr
 	node.id = sha256.Sum256([]byte(myaddr))
 	node.ipaddr = myaddr
-	succ := new(Finger)
-	succ.id = node.id
-	succ.ipaddr = node.ipaddr
-	node.successor = succ
+	//succ := new(Finger)
+	//succ.id = node.id
+	//succ.ipaddr = node.ipaddr
+	//node.successor = succ
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
 	fmt.Printf("Test\n")
@@ -154,12 +154,10 @@ func (node *ChordNode) maintain() {
 func (node *ChordNode) stabilize() {
 	//check to see if successor is still around
 	if node.successor == nil {
-		fmt.Printf("don't know own successor.\n")
 		return
 	}
 
 	//ask sucessor for predecessor
-	fmt.Printf("Asking successor for pred.\n")
 	msg := getpredMsg()
 	reply, err := send(msg, node.successor.ipaddr)
 	checkError(err)
@@ -168,12 +166,12 @@ func (node *ChordNode) stabilize() {
 	checkError(err)
 	if ft != nil {
 		predOfSucc := ft[0]
-
 		if predOfSucc.id != node.id {
-			//something should be updated
 			if inRange(predOfSucc.id, node.id, node.successor.id) {
 				*node.successor = predOfSucc
 			}
+		} else { //everything is fine
+			return
 		}
 	}
 
@@ -190,6 +188,10 @@ func (node *ChordNode) notify(newPred Finger) {
 	//update predecessor
 	node.predecessor = new(Finger)
 	*node.predecessor = newPred
+	if node.successor == nil {
+		node.successor = new(Finger)
+		*node.successor = newPred
+	}
 	//notify applications
 }
 
@@ -229,4 +231,23 @@ func inRange(x [32]byte, min [32]byte, max [32]byte) bool {
 	}
 
 	return false
+}
+
+func (f Finger) String() string {
+	return fmt.Sprintf("%x \t %s", f.id, f.ipaddr)
+}
+
+func (node *ChordNode) Info() string {
+	var succ, pred string
+	if node.successor != nil {
+		succ = node.successor.String()
+	} else {
+		succ = "Unknown"
+	}
+	if node.predecessor != nil {
+		pred = node.predecessor.String()
+	} else {
+		pred = "Unknown"
+	}
+	return fmt.Sprintf("Successor: %s\nPredecessor: %s\n", succ, pred)
 }

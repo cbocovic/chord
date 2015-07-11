@@ -247,9 +247,9 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		checkError(err)
 		newPred := ft[0]
 		if node.predecessor == nil || inRange(newPred.id, node.predecessor.id, node.id) {
-			fmt.Printf("Updating predecessor.\n")
 			node.notify(newPred)
 		}
+		c <- nullMsg()
 		//update finger table
 		return
 

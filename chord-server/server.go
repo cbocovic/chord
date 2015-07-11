@@ -24,11 +24,17 @@ func main() {
 	}
 	fmt.Printf("My address is: %s.\n", *addressPtr)
 	//block until receive input
+Loop:
 	for {
-		var c int
-		c, err := fmt.Scan(&c)
-		if err == io.EOF {
+		var cmd string
+		_, err := fmt.Scan(&cmd)
+		switch {
+		case cmd == "print":
+			//print out successor and predecessor
+			fmt.Printf("%s", me.Info())
 			break
+		case err == io.EOF:
+			break Loop
 		}
 
 	}

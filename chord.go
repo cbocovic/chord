@@ -32,7 +32,7 @@ import (
 
 //Finger type denoting identifying information about a ChordNode
 type Finger struct {
-	id     [32]byte
+	id     [sha256.Size]byte
 	ipaddr string
 }
 
@@ -43,7 +43,7 @@ type ChordNode struct {
 	successor   *Finger
 	fingerTable [256]Finger
 
-	id     [32]byte
+	id     [sha256.Size]byte
 	ipaddr string
 }
 
@@ -57,7 +57,7 @@ func checkError(err error) {
 
 //Lookup returns the address of the ChordNode that is responsible
 //for the key. The procedure begins at the address denoted by start.
-func Lookup(key [32]byte, start string) (addr string, err error) {
+func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 
 	addr = start
 
@@ -140,12 +140,15 @@ func Join(myaddr string, addr string) *ChordNode {
 //maintain will periodically perform maintenance operations
 func (node *ChordNode) maintain() {
 	fmt.Printf("Maintaining...\n")
+	ctr := 0
 	for {
 		//stabilize
 		node.stabilize()
 		time.Sleep(5 * time.Second)
 		//check predecessor
 		//update fingers
+		node.fix(ctr)
+		ctr = (ctr + 1) % 256
 	}
 }
 
@@ -199,7 +202,24 @@ func (node *ChordNode) checkPred() {
 
 }
 
-func (node *ChordNode) updateFingers() {
+func (node *ChordNode) fix(which int) {
+	if which == 0 || node.successor == nil {
+		return
+	}
+	var targetId [sha256.Size]byte
+	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
+	newip, err := Lookup(targetId, node.successor.ipaddr)
+	checkError(err)
+
+	//find id of node
+	msg := getidMsg()
+	reply, err := send(msg, newip)
+	checkError(err)
+
+	newfinger := new(Finger)
+	newfinger.ipaddr = newip
+	newfinger.id, _ = parseId(reply)
+	node.fingerTable[which] = *newfinger
 
 }
 
@@ -208,15 +228,15 @@ func (node *ChordNode) Finalize() {
 }
 
 //inRange checks to see if the value x is in (min, max)
-func inRange(x [32]byte, min [32]byte, max [32]byte) bool {
+func inRange(x [sha256.Size]byte, min [sha256.Size]byte, max [sha256.Size]byte) bool {
 	//There are 3 cases: min < x and x < max,
 	//x < max and max < min, max < min and min < x
 	xint := new(big.Int)
 	maxint := new(big.Int)
 	minint := new(big.Int)
-	xint.SetBytes(x[:32])
-	minint.SetBytes(min[:32])
-	maxint.SetBytes(max[:32])
+	xint.SetBytes(x[:sha256.Size])
+	minint.SetBytes(min[:sha256.Size])
+	maxint.SetBytes(max[:sha256.Size])
 
 	if xint.Cmp(minint) == 1 && maxint.Cmp(xint) == 1 {
 		return true
@@ -231,6 +251,31 @@ func inRange(x [32]byte, min [32]byte, max [32]byte) bool {
 	}
 
 	return false
+}
+
+//target returns the target id used by the fix function
+func target(me [sha256.Size]byte, which int) []byte {
+	meint := new(big.Int)
+	meint.SetBytes(me[:sha256.Size])
+
+	baseint := new(big.Int)
+	baseint.SetUint64(2)
+
+	powint := new(big.Int)
+	powint.SetInt64(int64(which - 1))
+
+	var biggest [sha256.Size]byte
+	for i := range biggest {
+		biggest[i] = 255
+	}
+
+	modint := new(big.Int)
+	modint.SetBytes(biggest[:sha256.Size])
+
+	target := new(big.Int)
+	target.Exp(baseint, powint, modint)
+	target.Add(meint, target)
+	return target.Bytes()[:sha256.Size]
 }
 
 func (f Finger) String() string {

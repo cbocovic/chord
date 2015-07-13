@@ -32,7 +32,9 @@ Loop:
 		case cmd == "print":
 			//print out successor and predecessor
 			fmt.Printf("%s", me.Info())
-			break
+		case cmd == "fingers":
+			//print out successor and predecessor
+			fmt.Printf("%s", me.ShowFingers())
 		case err == io.EOF:
 			break Loop
 		}

@@ -119,12 +119,12 @@ func sendpredMsg(finger Finger) []byte {
 	chordMsg := new(NetworkMessage_ChordMessage)
 	command := NetworkMessage_Command(NetworkMessage_Command_value["GetPred"])
 	chordMsg.Cmd = &command
-	sfMsg := new(SendFingersMessage)
+	pMsg := new(PredMessage)
 	fingerMsg := new(FingerMessage)
 	fingerMsg.Id = proto.String(string(finger.id[:32]))
 	fingerMsg.Address = proto.String(finger.ipaddr)
-	sfMsg.Fingers = append(sfMsg.Fingers, fingerMsg)
-	chordMsg.Sfmsg = sfMsg
+	pMsg.Pred = fingerMsg
+	chordMsg.Cpmsg = pMsg
 	msg.Msg = chordMsg
 
 	data, err := proto.Marshal(msg)
@@ -142,12 +142,12 @@ func claimpredMsg(finger Finger) []byte {
 	chordMsg := new(NetworkMessage_ChordMessage)
 	command := NetworkMessage_Command(NetworkMessage_Command_value["ClaimPred"])
 	chordMsg.Cmd = &command
-	sfMsg := new(SendFingersMessage)
+	predMsg := new(PredMessage)
 	fingerMsg := new(FingerMessage)
 	fingerMsg.Id = proto.String(string(finger.id[:32]))
 	fingerMsg.Address = proto.String(finger.ipaddr)
-	sfMsg.Fingers = append(sfMsg.Fingers, fingerMsg)
-	chordMsg.Sfmsg = sfMsg
+	predMsg.Pred = fingerMsg
+	chordMsg.Cpmsg = predMsg
 	msg.Msg = chordMsg
 
 	data, err := proto.Marshal(msg)
@@ -243,9 +243,8 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		return
 	case cmd == NetworkMessage_Command_value["ClaimPred"]:
 		//extract finger
-		ft, err := parseFingers(data)
+		newPred, err := parseFinger(data)
 		checkError(err)
-		newPred := ft[0]
 		if node.predecessor == nil || inRange(newPred.id, node.predecessor.id, node.id) {
 			node.notify(newPred)
 		}
@@ -277,8 +276,29 @@ func parseFingers(data []byte) (ft []Finger, err error) {
 		newfinger := new(Finger)
 		copy(newfinger.id[:], []byte(*finger.Id))
 		newfinger.ipaddr = *finger.Address
-		ft = append(ft, *newfinger)
+		if newfinger.ipaddr != "" {
+			ft = append(ft, *newfinger)
+		}
 	}
+	return
+}
+
+func parseFinger(data []byte) (f Finger, err error) {
+	msg := new(NetworkMessage)
+	err = proto.Unmarshal(data, msg)
+	if msg.GetProto() != 1 {
+		//TODO: return non-nil error
+		return
+	}
+	chordmsg := msg.GetMsg()
+	if chordmsg == nil { //then received null msg instead. return nil
+		return
+	}
+	cpmsg := chordmsg.GetCpmsg()
+	finger := cpmsg.GetPred()
+	copy(f.id[:], []byte(*finger.Id))
+	f.ipaddr = *finger.Address
+
 	return
 }
 

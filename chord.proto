@@ -9,7 +9,7 @@ message FingerMessage {
 	required string id = 2;
 }
 
-message ClaimPredMessage {
+message PredMessage {
 	required FingerMessage pred = 1;
 }
 
@@ -32,7 +32,7 @@ message NetworkMessage {
 
 	message ChordMessage {
 		required Command cmd = 1;
-		optional ClaimPredMessage cpmsg = 2;
+		optional PredMessage cpmsg = 2;
 		optional SendIdMessage sidmsg = 4;
 		optional SendFingersMessage sfmsg = 5;
 	}

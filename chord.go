@@ -41,7 +41,7 @@ type Finger struct {
 type ChordNode struct {
 	predecessor *Finger
 	successor   *Finger
-	fingerTable [256]Finger
+	fingerTable [sha256.Size*8 + 1]Finger
 
 	id     [sha256.Size]byte
 	ipaddr string
@@ -76,7 +76,7 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 			fmt.Printf("Looped through table. Returning.\n")
 			break
 		}
-		if inRange(f.id, ft[0].id, key) {
+		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
 			fmt.Printf("Node with id %x is closer to key %x.\n", f.id, key)
 			addr, err = Lookup(key, f.ipaddr)
 			checkError(err)
@@ -93,10 +93,10 @@ func Create(myaddr string) *ChordNode {
 	//create id by hashing ipaddr
 	node.id = sha256.Sum256([]byte(myaddr))
 	node.ipaddr = myaddr
-	//succ := new(Finger)
-	//succ.id = node.id
-	//succ.ipaddr = node.ipaddr
-	//node.successor = succ
+	me := new(Finger)
+	me.id = node.id
+	me.ipaddr = node.ipaddr
+	node.fingerTable[0] = *me
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
 	fmt.Printf("Test\n")
@@ -125,7 +125,7 @@ func Join(myaddr string, addr string) *ChordNode {
 	fmt.Printf("Found successor: %x.\n", succ.id)
 	succ.ipaddr = successor
 	node.successor = succ
-	node.fingerTable[0] = *succ
+	node.fingerTable[1] = *succ
 
 	//TODO: remove after testing
 	//msg := pingMsg()
@@ -169,13 +169,14 @@ func (node *ChordNode) stabilize() {
 	reply, err := send(msg, node.successor.ipaddr)
 	checkError(err)
 
-	ft, err := parseFingers(reply)
+	predOfSucc, err := parseFinger(reply)
 	checkError(err)
-	if ft != nil {
-		predOfSucc := ft[0]
+	if predOfSucc.ipaddr != "" {
 		if predOfSucc.id != node.id {
 			if inRange(predOfSucc.id, node.id, node.successor.id) {
+				fmt.Printf("Previous successor: %s. ", node.successor.ipaddr)
 				*node.successor = predOfSucc
+				fmt.Printf("New successor: %s.\n", node.successor.ipaddr)
 			}
 		} else { //everything is fine
 			return
@@ -208,18 +209,19 @@ func (node *ChordNode) checkPred() {
 
 func (node *ChordNode) fix(which int) {
 	fmt.Printf("Fixing finger %d\n.", which)
-	if which == 0 || node.successor == nil {
+	if which == 0 || which == 1 || node.successor == nil {
 		return
 	}
 	var targetId [sha256.Size]byte
 	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
-	fmt.Printf("Looking for id: %v\n.", targetId)
+	fmt.Printf("Looking for id: %x\n.", targetId)
 	newip, err := Lookup(targetId, node.successor.ipaddr)
 	checkError(err)
 	fmt.Printf("Found ip of finger: %s\n.", newip)
 
 	//find id of node
 	msg := getidMsg()
+	fmt.Printf("Fix: contacting %s.\n", newip)
 	reply, err := send(msg, newip)
 	checkError(err)
 
@@ -308,7 +310,7 @@ func (node *ChordNode) Info() string {
 func (node *ChordNode) ShowFingers() string {
 	table := ""
 	for _, finger := range node.fingerTable {
-		table += fmt.Sprintf("%s\n", finger.String)
+		table += fmt.Sprintf("%s\n", finger.String())
 	}
 	return table
 }

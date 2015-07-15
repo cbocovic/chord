@@ -8,10 +8,8 @@ import (
 //Send opens a connection to addr, sends msg, and then returns the
 //reply
 func send(msg []byte, addr string) (reply []byte, err error) {
-	fmt.Printf("Sending message to %s.\n", addr)
 
 	conn, err := net.Dial("tcp", addr)
-	checkError(err)
 	if err != nil {
 		//TODO: look up conventions on errors for Go.
 		return
@@ -52,7 +50,6 @@ func (node *ChordNode) listen(addr string) {
 		defer fmt.Printf("No longer listening...\n")
 		for {
 			if conn, err := listener.Accept(); err == nil {
-				fmt.Printf("Accepted connection\n")
 				go handleMessage(conn, c, c2)
 			} else {
 				continue

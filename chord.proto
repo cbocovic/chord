@@ -28,6 +28,7 @@ message NetworkMessage {
 		GetId = 4;
 		GetFingers = 5;
 		ClaimPred = 6;
+		GetSucc = 7;
 	};
 
 	message ChordMessage {

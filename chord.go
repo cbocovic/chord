@@ -39,9 +39,10 @@ type Finger struct {
 //ChordNode type denoting a Chord server. Each server has a predecessor, successor, fingertable
 // containing information about log(N) other nodes in the network, identifier, and InternetAddress.
 type ChordNode struct {
-	predecessor *Finger
-	successor   *Finger
-	fingerTable [sha256.Size*8 + 1]Finger
+	predecessor   *Finger
+	successor     *Finger
+	successorList [sha256.Size * 8]Finger
+	fingerTable   [sha256.Size*8 + 1]Finger
 
 	id     [sha256.Size]byte
 	ipaddr string
@@ -69,15 +70,12 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	checkError(err)
 
 	//loop through finger table and see what the closest finger is
-	fmt.Printf("Finger table has %d fingers.\n", len(ft))
 	for i := len(ft) - 1; i > 0; i-- {
 		f := ft[i]
 		if i == 0 {
-			fmt.Printf("Looped through table. Returning.\n")
 			break
 		}
 		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
-			fmt.Printf("Node with id %x is closer to key %x.\n", f.id, key)
 			addr, err = Lookup(key, f.ipaddr)
 			checkError(err)
 			return
@@ -99,7 +97,6 @@ func Create(myaddr string) *ChordNode {
 	node.fingerTable[0] = *me
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
-	fmt.Printf("Test\n")
 	go node.maintain()
 	fmt.Printf("Exiting create.\n")
 	return node
@@ -126,18 +123,8 @@ func Join(myaddr string, addr string) *ChordNode {
 	succ.ipaddr = successor
 	node.successor = succ
 	node.fingerTable[1] = *succ
+	node.successorList[0] = *succ
 
-	//TODO: remove after testing
-	//msg := pingMsg()
-
-	//reply, err := send(msg, addr)
-	//checkError(err)
-
-	//if succ, err := parsePong(reply); succ == true && err == nil {
-	//	fmt.Printf("Successfully joined!\n")
-	//} else {
-	//	fmt.Printf("Fail!\n")
-	//}
 	return node
 }
 
@@ -160,14 +147,38 @@ func (node *ChordNode) maintain() {
 //stablize ensures that the node's successor's predecessor is itself
 //If not, it updates its successor's predecessor.
 func (node *ChordNode) stabilize() {
-	//check to see if successor is still around
 	if node.successor == nil {
 		return
 	}
 
-	//ask sucessor for predecessor
-	msg := getpredMsg()
+	//check to see if successor is still around
+	msg := pingMsg()
 	reply, err := send(msg, node.successor.ipaddr)
+	if err != nil {
+		//successor failed to respond
+		*node.successor = node.successorList[1]
+		node.successorList[0] = *node.successor
+		node.fingerTable[1] = *node.successor
+		fmt.Printf("Updated successor.\n")
+		return
+	}
+
+	//everything is OK, update successor list
+	fmt.Printf("Updating successor list...")
+	msg = getsuccessorsMsg()
+	reply, err = send(msg, node.successor.ipaddr)
+	checkError(err)
+	ft, err := parseFingers(reply)
+	checkError(err)
+	for i := range ft {
+		if i < sha256.Size {
+			node.successorList[i+1] = ft[i]
+		}
+	}
+
+	//ask sucessor for predecessor
+	msg = getpredMsg()
+	reply, err = send(msg, node.successor.ipaddr)
 	checkError(err)
 
 	predOfSucc, err := parseFinger(reply)
@@ -175,9 +186,9 @@ func (node *ChordNode) stabilize() {
 	if predOfSucc.ipaddr != "" {
 		if predOfSucc.id != node.id {
 			if inRange(predOfSucc.id, node.id, node.successor.id) {
-				fmt.Printf("Previous successor: %s. ", node.successor.ipaddr)
 				*node.successor = predOfSucc
-				fmt.Printf("New successor: %s.\n", node.successor.ipaddr)
+				node.fingerTable[1] = predOfSucc
+				node.successorList[0] = predOfSucc
 			}
 		} else { //everything is fine
 			return
@@ -197,7 +208,7 @@ func (node *ChordNode) notify(newPred Finger) {
 	//update predecessor
 	node.predecessor = new(Finger)
 	*node.predecessor = newPred
-	if node.successor == nil {
+	if node.successor == nil { //TODO: so if you get here, you were probably the first node.
 		node.successor = new(Finger)
 		*node.successor = newPred
 	}
@@ -320,8 +331,24 @@ func (node *ChordNode) Info() string {
 
 func (node *ChordNode) ShowFingers() string {
 	table := ""
-	for _, finger := range node.fingerTable {
-		table += fmt.Sprintf("%s\n", finger.String())
+	for i, finger := range node.fingerTable {
+		if finger.ipaddr != "" {
+			if i == 0 || finger.ipaddr != node.fingerTable[i-1].ipaddr {
+				table += fmt.Sprintf("%s\n", finger.String())
+			}
+		}
+	}
+	return table
+}
+
+func (node *ChordNode) ShowSucc() string {
+	table := ""
+	for i, finger := range node.successorList {
+		if finger.ipaddr != "" {
+			if i == 0 || finger.ipaddr != node.successorList[i-1].ipaddr {
+				table += fmt.Sprintf("%s\n", finger.String())
+			}
+		}
 	}
 	return table
 }

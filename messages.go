@@ -195,6 +195,23 @@ func pongMsg() []byte {
 	return data
 }
 
+func getsuccessorsMsg() []byte {
+	msg := new(NetworkMessage)
+	msg.Proto = proto.Uint32(1)
+	chordMsg := new(NetworkMessage_ChordMessage)
+	command := NetworkMessage_Command(NetworkMessage_Command_value["GetSucc"])
+	chordMsg.Cmd = &command
+	msg.Msg = chordMsg
+
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+
+	return data
+
+}
+
 func nullMsg() []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(1)
@@ -239,7 +256,7 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		c <- sendidMsg(node.id[:32])
 		return
 	case cmd == NetworkMessage_Command_value["GetFingers"]:
-		c <- sendfingersMsg(node.fingerTable[:32])
+		c <- sendfingersMsg(node.fingerTable[:32+1])
 		return
 	case cmd == NetworkMessage_Command_value["ClaimPred"]:
 		//extract finger
@@ -250,6 +267,9 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		}
 		c <- nullMsg()
 		//update finger table
+		return
+	case cmd == NetworkMessage_Command_value["GetSucc"]:
+		c <- sendfingersMsg(node.successorList[:32])
 		return
 
 	}
@@ -329,7 +349,6 @@ func parsePong(data []byte) (success bool, err error) {
 	}
 	chordmsg := msg.GetMsg()
 	command := int32(chordmsg.GetCmd())
-	fmt.Printf("Received: %d, Expected: %d\n", command, NetworkMessage_Command_value["Pong"])
 	if command == NetworkMessage_Command_value["Pong"] {
 		success = true
 	} else {

@@ -33,8 +33,11 @@ Loop:
 			//print out successor and predecessor
 			fmt.Printf("%s", me.Info())
 		case cmd == "fingers":
-			//print out successor and predecessor
+			//print out finger table
 			fmt.Printf("%s", me.ShowFingers())
+		case cmd == "succ":
+			//print out successor list
+			fmt.Printf("%s", me.ShowSucc())
 		case err == io.EOF:
 			break Loop
 		}

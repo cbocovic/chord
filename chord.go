@@ -146,10 +146,11 @@ func (node *ChordNode) maintain() {
 	fmt.Printf("Maintaining...\n")
 	ctr := 0
 	for {
+		time.Sleep(5 * time.Second)
 		//stabilize
 		node.stabilize()
-		time.Sleep(5 * time.Second)
 		//check predecessor
+		node.checkPred()
 		//update fingers
 		node.fix(ctr)
 		ctr = (ctr + 1) % 256
@@ -204,6 +205,20 @@ func (node *ChordNode) notify(newPred Finger) {
 }
 
 func (node *ChordNode) checkPred() {
+	fmt.Printf("Checking predecessor.\n")
+	if node.predecessor == nil {
+		return
+	}
+
+	msg := pingMsg()
+	reply, err := send(msg, node.predecessor.ipaddr)
+	checkError(err)
+
+	if success, err := parsePong(reply); !success || err != nil {
+		node.predecessor = nil
+	}
+
+	return
 
 }
 
@@ -214,21 +229,17 @@ func (node *ChordNode) fix(which int) {
 	}
 	var targetId [sha256.Size]byte
 	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
-	fmt.Printf("Looking for id: %x\n.", targetId)
 	newip, err := Lookup(targetId, node.successor.ipaddr)
 	checkError(err)
-	fmt.Printf("Found ip of finger: %s\n.", newip)
 
 	//find id of node
 	msg := getidMsg()
-	fmt.Printf("Fix: contacting %s.\n", newip)
 	reply, err := send(msg, newip)
 	checkError(err)
 
 	newfinger := new(Finger)
 	newfinger.ipaddr = newip
 	newfinger.id, _ = parseId(reply)
-	fmt.Printf("Found id of finger: %x\n.", newfinger.id)
 	node.fingerTable[which] = *newfinger
 
 }

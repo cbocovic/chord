@@ -64,7 +64,9 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 
 	msg := getfingersMsg()
 	reply, err := send(msg, start)
-	checkError(err)
+	if err != nil { //node failed
+		return
+	}
 
 	ft, err := parseFingers(reply)
 	checkError(err)
@@ -77,7 +79,9 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 		}
 		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
 			addr, err = Lookup(key, f.ipaddr)
-			checkError(err)
+			if err != nil { //node failed
+				continue
+			}
 			return
 		}
 	}
@@ -223,7 +227,9 @@ func (node *ChordNode) checkPred() {
 
 	msg := pingMsg()
 	reply, err := send(msg, node.predecessor.ipaddr)
-	checkError(err)
+	if err != nil {
+		node.predecessor = nil
+	}
 
 	if success, err := parsePong(reply); !success || err != nil {
 		node.predecessor = nil
@@ -241,6 +247,9 @@ func (node *ChordNode) fix(which int) {
 	var targetId [sha256.Size]byte
 	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
 	newip, err := Lookup(targetId, node.successor.ipaddr)
+	if err != nil { //node failed: TODO make more robust
+		newip, err = Lookup(targetId, node.successorList[1].ipaddr)
+	}
 	checkError(err)
 
 	//find id of node

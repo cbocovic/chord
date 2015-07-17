@@ -1,0 +1,11 @@
+#!/bin/bash
+
+(nohup chord-server > server1.txt) &
+proc1=$!
+
+for i in `seq 1 $1`;
+do
+	echo $i
+done
+
+wait "$proc1"

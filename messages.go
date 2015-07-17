@@ -232,6 +232,9 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 
 	err := proto.Unmarshal(data, msg)
 	checkError(err)
+	if err != nil {
+		return
+	}
 
 	protocol := msg.GetProto()
 	if protocol != 1 {
@@ -262,6 +265,10 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		//extract finger
 		newPred, err := parseFinger(data)
 		checkError(err)
+		if err != nil {
+			c <- nullMsg()
+			break
+		}
 		if node.predecessor == nil || inRange(newPred.id, node.predecessor.id, node.id) {
 			node.notify(newPred)
 		}
@@ -341,6 +348,9 @@ func parsePong(data []byte) (success bool, err error) {
 	msg := new(NetworkMessage)
 	err = proto.Unmarshal(data, msg)
 	checkError(err)
+	if err != nil {
+		return false, err
+	}
 
 	if msg.GetProto() != 1 {
 		//TODO: return non-nil error

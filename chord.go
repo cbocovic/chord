@@ -52,7 +52,6 @@ type ChordNode struct {
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		os.Exit(1)
 	}
 }
 
@@ -69,7 +68,9 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	}
 
 	ft, err := parseFingers(reply)
-	checkError(err)
+	if err != nil {
+		return
+	}
 
 	//loop through finger table and see what the closest finger is
 	for i := len(ft) - 1; i > 0; i-- {
@@ -161,6 +162,13 @@ func (node *ChordNode) stabilize() {
 	if err != nil {
 		//successor failed to respond
 		*node.successor = node.successorList[1]
+		if node.successor.ipaddr == node.ipaddr {
+			node.successor = nil
+			if node.successor == nil {
+				fmt.Printf("Set successor to nil.\n")
+			}
+			return
+		}
 		node.successorList[0] = *node.successor
 		node.fingerTable[1] = *node.successor
 		fmt.Printf("Updated successor.\n")
@@ -171,9 +179,13 @@ func (node *ChordNode) stabilize() {
 	fmt.Printf("Updating successor list...")
 	msg = getsuccessorsMsg()
 	reply, err = send(msg, node.successor.ipaddr)
-	checkError(err)
+	if err != nil {
+		return
+	}
 	ft, err := parseFingers(reply)
-	checkError(err)
+	if err != nil {
+		return
+	}
 	for i := range ft {
 		if i < sha256.Size {
 			node.successorList[i+1] = ft[i]
@@ -183,10 +195,14 @@ func (node *ChordNode) stabilize() {
 	//ask sucessor for predecessor
 	msg = getpredMsg()
 	reply, err = send(msg, node.successor.ipaddr)
-	checkError(err)
+	if err != nil {
+		return
+	}
 
 	predOfSucc, err := parseFinger(reply)
-	checkError(err)
+	if err != nil { //node failed
+		return
+	}
 	if predOfSucc.ipaddr != "" {
 		if predOfSucc.id != node.id {
 			if inRange(predOfSucc.id, node.id, node.successor.id) {
@@ -250,12 +266,16 @@ func (node *ChordNode) fix(which int) {
 	if err != nil { //node failed: TODO make more robust
 		newip, err = Lookup(targetId, node.successorList[1].ipaddr)
 	}
-	checkError(err)
+	if err != nil {
+		return
+	}
 
 	//find id of node
 	msg := getidMsg()
 	reply, err := send(msg, newip)
-	checkError(err)
+	if err != nil {
+		return
+	}
 
 	newfinger := new(Finger)
 	newfinger.ipaddr = newip
@@ -265,6 +285,8 @@ func (node *ChordNode) fix(which int) {
 }
 
 func (node *ChordNode) Finalize() {
+	//send message to all children to terminate
+
 	fmt.Printf("Exiting...\n")
 }
 

@@ -71,6 +71,14 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	if err != nil {
 		return
 	}
+	if len(ft) < 2 {
+		fmt.Printf("Key %x: Table too small. returning self.\n", key)
+		return
+	}
+	if key == ft[0].id {
+		start = ft[0].ipaddr
+		return
+	}
 
 	//loop through finger table and see what the closest finger is
 	for i := len(ft) - 1; i > 0; i-- {
@@ -79,6 +87,7 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 			break
 		}
 		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
+			fmt.Printf("Key %x: Found closer node: %s.\n", key, f.ipaddr)
 			addr, err = Lookup(key, f.ipaddr)
 			if err != nil { //node failed
 				continue
@@ -86,6 +95,9 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 			return
 		}
 	}
+	fmt.Printf("Key %x: I am the closest preceeding. Returning my successor.\n", key)
+	addr = ft[1].ipaddr
+	fmt.Printf("Key %x: Successor of %s is %s.\n", key, ft[0].ipaddr, ft[1].ipaddr)
 
 	return
 }
@@ -164,19 +176,14 @@ func (node *ChordNode) stabilize() {
 		*node.successor = node.successorList[1]
 		if node.successor.ipaddr == node.ipaddr {
 			node.successor = nil
-			if node.successor == nil {
-				fmt.Printf("Set successor to nil.\n")
-			}
 			return
 		}
 		node.successorList[0] = *node.successor
 		node.fingerTable[1] = *node.successor
-		fmt.Printf("Updated successor.\n")
 		return
 	}
 
 	//everything is OK, update successor list
-	fmt.Printf("Updating successor list...")
 	msg = getsuccessorsMsg()
 	reply, err = send(msg, node.successor.ipaddr)
 	if err != nil {
@@ -221,22 +228,26 @@ func (node *ChordNode) stabilize() {
 	me.ipaddr = node.ipaddr
 	msg = claimpredMsg(*me)
 	send(msg, node.successor.ipaddr)
+	fmt.Printf("Node %s claiming to predecessor of node %s.\n", node.ipaddr, node.successor.ipaddr)
 
 }
 
 func (node *ChordNode) notify(newPred Finger) {
 	//update predecessor
+	fmt.Printf("Node %s updating pred.\n", node.ipaddr)
 	node.predecessor = new(Finger)
 	*node.predecessor = newPred
 	if node.successor == nil { //TODO: so if you get here, you were probably the first node.
 		node.successor = new(Finger)
 		*node.successor = newPred
+		node.fingerTable[1] = newPred
+		node.successorList[0] = newPred
 	}
 	//notify applications
 }
 
 func (node *ChordNode) checkPred() {
-	fmt.Printf("Checking predecessor.\n")
+	//fmt.Printf("Checking predecessor.\n")
 	if node.predecessor == nil {
 		return
 	}
@@ -244,10 +255,12 @@ func (node *ChordNode) checkPred() {
 	msg := pingMsg()
 	reply, err := send(msg, node.predecessor.ipaddr)
 	if err != nil {
+		fmt.Printf("Node %s setting pred back to nil.\n", node.ipaddr)
 		node.predecessor = nil
 	}
 
 	if success, err := parsePong(reply); !success || err != nil {
+		fmt.Printf("Node %s setting pred back to nil.\n", node.ipaddr)
 		node.predecessor = nil
 	}
 
@@ -256,19 +269,21 @@ func (node *ChordNode) checkPred() {
 }
 
 func (node *ChordNode) fix(which int) {
-	fmt.Printf("Fixing finger %d\n.", which)
+	//fmt.Printf("Node %s fixing finger %d\n.", node.fingerTable[0].String(), which)
 	if which == 0 || which == 1 || node.successor == nil {
 		return
 	}
 	var targetId [sha256.Size]byte
 	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
+	fmt.Printf("Node %s is looking for target %x.\n", node.ipaddr, targetId)
 	newip, err := Lookup(targetId, node.successor.ipaddr)
 	if err != nil { //node failed: TODO make more robust
 		newip, err = Lookup(targetId, node.successorList[1].ipaddr)
 	}
-	if err != nil {
+	if err != nil || newip == node.ipaddr {
 		return
 	}
+	fmt.Printf("Target %x belongs to %s.\n", targetId, newip)
 
 	//find id of node
 	msg := getidMsg()
@@ -342,7 +357,7 @@ func target(me [sha256.Size]byte, which int) []byte {
 }
 
 func (f Finger) String() string {
-	return fmt.Sprintf("%x \t %s", f.id, f.ipaddr)
+	return fmt.Sprintf("%s", f.ipaddr)
 }
 
 func (node *ChordNode) Info() string {
@@ -357,7 +372,7 @@ func (node *ChordNode) Info() string {
 	} else {
 		pred = "Unknown"
 	}
-	return fmt.Sprintf("Successor: %s\nPredecessor: %s\n", succ, pred)
+	return fmt.Sprintf("%x\t%s\t%s\n", node.id, succ, pred)
 }
 
 func (node *ChordNode) ShowFingers() string {

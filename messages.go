@@ -249,17 +249,26 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		c <- pongMsg()
 		return
 	case cmd == NetworkMessage_Command_value["GetPred"]:
-		if node.predecessor == nil {
+		node.request <- Request{false, false, -1}
+		pred := <-node.finger
+		if pred.zero() {
 			c <- nullMsg()
 		} else {
-			c <- sendpredMsg(*node.predecessor) //node.predecessor)
+			c <- sendpredMsg(pred) //node.predecessor)
 		}
 		return
 	case cmd == NetworkMessage_Command_value["GetId"]:
 		c <- sendidMsg(node.id[:32])
 		return
 	case cmd == NetworkMessage_Command_value["GetFingers"]:
-		c <- sendfingersMsg(node.fingerTable[:32+1])
+		table := make([]Finger, 33)
+		for i := range table {
+			node.request <- Request{false, false, i}
+			f := <-node.finger
+			table[i] = f
+		}
+
+		c <- sendfingersMsg(table)
 		return
 	case cmd == NetworkMessage_Command_value["ClaimPred"]:
 		//extract finger
@@ -269,14 +278,24 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 			c <- nullMsg()
 			break
 		}
-		if node.predecessor == nil || inRange(newPred.id, node.predecessor.id, node.id) {
+		node.request <- Request{false, false, -1}
+		pred := <-node.finger
+
+		if pred.zero() || inRange(newPred.id, pred.id, node.id) {
 			node.notify(newPred)
 		}
 		c <- nullMsg()
 		//update finger table
 		return
 	case cmd == NetworkMessage_Command_value["GetSucc"]:
-		c <- sendfingersMsg(node.successorList[:32])
+		table := make([]Finger, 32)
+		for i := range table {
+			node.request <- Request{false, true, i}
+			f := <-node.finger
+			table[i] = f
+		}
+
+		c <- sendfingersMsg(table)
 		return
 
 	}

@@ -1,23 +1,7 @@
 /* Package chord
  *
  * This package is a collection of structures and functions associated
- * with the Chord distributed lookup protocol. Each ChordServer contains
- * the following data items in order to achieve logarithmic lookups:
- *		* id - the identifier of the node, modulo the max size (N) of the DHT
- *		* ipaddr - the InternetAddress of a the node
- *
- *		* predecessor - the ChordNode immediately before it in the id ring
- *		* successor - the ChordNode immediately after it in the id ring
- *		* fingerTable - routing information about log(N) other nodes in the DHT
- *
- * We define the following functions in this file:
- *		Static functions:
- *			* lookup(key ulong, node InternetAddress) - a function to lookup a key at a particular
- *					node in the DHT. Returns the Internet Address of the node that owns that key
- *
- *		Receiver functions:
- *			* join(id ulong, node InternetAddress) - joins the DHT with the identifier id by
- *					contacting
+ * with the Chord distributed lookup protocol.
  */
 
 package chord
@@ -27,12 +11,19 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"time"
 )
 
 //Finger type denoting identifying information about a ChordNode
 type Finger struct {
 	id     [sha256.Size]byte
 	ipaddr string
+}
+
+type Request struct {
+	write bool
+	succ  bool
+	index int
 }
 
 //ChordNode type denoting a Chord server. Each server has a predecessor, successor, fingertable
@@ -42,6 +33,9 @@ type ChordNode struct {
 	successor     *Finger
 	successorList [sha256.Size * 8]Finger
 	fingerTable   [sha256.Size*8 + 1]Finger
+
+	finger  chan Finger
+	request chan Request
 
 	id     [sha256.Size]byte
 	ipaddr string
@@ -103,12 +97,21 @@ func Create(myaddr string) *ChordNode {
 	//create id by hashing ipaddr
 	node.id = sha256.Sum256([]byte(myaddr))
 	node.ipaddr = myaddr
+	c := make(chan Finger)
+	c2 := make(chan Request)
+	node.finger = c
+	node.request = c2
 	me := new(Finger)
 	me.id = node.id
 	me.ipaddr = node.ipaddr
 	node.fingerTable[0] = *me
+	succ := new(Finger)
+	node.successor = succ
+	pred := new(Finger)
+	node.predecessor = pred
 	fmt.Printf("Created node with id: %x\n", node.id)
 	node.listen(myaddr)
+	go node.data()
 	go node.maintain()
 	fmt.Printf("Exiting create.\n")
 	return node
@@ -133,18 +136,67 @@ func Join(myaddr string, addr string) *ChordNode {
 	succ.id, _ = parseId(reply)
 	fmt.Printf("Found successor: %x.\n", succ.id)
 	succ.ipaddr = successor
-	node.successor = succ
-	node.fingerTable[1] = *succ
-	node.successorList[0] = *succ
+	node.query(true, false, 1, succ)
 
 	return node
 }
 
+//data manages reads and writes to the node data structure
+func (node *ChordNode) data() {
+	//fmt.Printf("Node %s data manager is ready.\n", node.ipaddr)
+	for {
+		req := <-node.request
+		//fmt.Printf("Node %s processing query.\n", node.ipaddr)
+		if req.write {
+			if req.succ {
+				node.successorList[req.index] = <-node.finger
+			} else {
+				if req.index < 0 {
+					*node.predecessor = <-node.finger
+				} else if req.index == 1 {
+					*node.successor = <-node.finger
+					node.fingerTable[1] = *node.successor
+					node.successorList[0] = *node.successor
+				} else {
+					node.fingerTable[req.index] = <-node.finger
+				}
+			}
+		} else { //req.read
+			if req.succ {
+				node.finger <- node.successorList[req.index]
+			} else {
+				if req.index < 0 {
+					node.finger <- *node.predecessor
+				} else {
+					node.finger <- node.fingerTable[req.index]
+				}
+			}
+		}
+	}
+}
+
+//query allows functions to read from or write to the node object
+func (node *ChordNode) query(write bool, succ bool, index int, newf *Finger) Finger {
+	f := new(Finger)
+	req := Request{write, succ, index}
+	node.request <- req
+	//fmt.Printf("Node %s sent query.\n", node.ipaddr)
+	if write {
+		node.finger <- *newf
+	} else {
+		*f = <-node.finger
+	}
+
+	//fmt.Printf("Node %s has received query response.\n", node.ipaddr)
+	return *f
+}
+
 //maintain will periodically perform maintenance operations
 func (node *ChordNode) maintain() {
-	fmt.Printf("Maintaining...\n")
+	fmt.Printf("Node %s maintaining.\n", node.ipaddr)
 	ctr := 0
 	for {
+		time.Sleep(100 * time.Millisecond)
 		//stabilize
 		node.stabilize()
 		//check predecessor
@@ -158,28 +210,31 @@ func (node *ChordNode) maintain() {
 //stablize ensures that the node's successor's predecessor is itself
 //If not, it updates its successor's predecessor.
 func (node *ChordNode) stabilize() {
-	if node.successor == nil {
+	//fmt.Printf("Node %s is stabilizing...\n", node.ipaddr)
+	successor := node.query(false, false, 1, nil)
+
+	if successor.zero() {
 		return
 	}
 
 	//check to see if successor is still around
 	msg := pingMsg()
-	reply, err := send(msg, node.successor.ipaddr)
+	reply, err := send(msg, successor.ipaddr)
 	if err != nil {
 		//successor failed to respond
-		*node.successor = node.successorList[1]
-		if node.successor.ipaddr == node.ipaddr {
-			node.successor = nil
+		successor = node.query(false, true, 1, nil)
+		node.query(true, false, 1, &successor)
+		if successor.ipaddr == node.ipaddr {
+			successor.ipaddr = ""
+			node.query(true, false, 1, &successor)
 			return
 		}
-		node.successorList[0] = *node.successor
-		node.fingerTable[1] = *node.successor
 		return
 	}
 
 	//everything is OK, update successor list
 	msg = getsuccessorsMsg()
-	reply, err = send(msg, node.successor.ipaddr)
+	reply, err = send(msg, successor.ipaddr)
 	if err != nil {
 		return
 	}
@@ -189,13 +244,13 @@ func (node *ChordNode) stabilize() {
 	}
 	for i := range ft {
 		if i < sha256.Size {
-			node.successorList[i+1] = ft[i]
+			node.query(true, true, i+1, &ft[i])
 		}
 	}
 
 	//ask sucessor for predecessor
 	msg = getpredMsg()
-	reply, err = send(msg, node.successor.ipaddr)
+	reply, err = send(msg, successor.ipaddr)
 	if err != nil {
 		return
 	}
@@ -206,10 +261,8 @@ func (node *ChordNode) stabilize() {
 	}
 	if predOfSucc.ipaddr != "" {
 		if predOfSucc.id != node.id {
-			if inRange(predOfSucc.id, node.id, node.successor.id) {
-				*node.successor = predOfSucc
-				node.fingerTable[1] = predOfSucc
-				node.successorList[0] = predOfSucc
+			if inRange(predOfSucc.id, node.id, successor.id) {
+				node.query(true, false, 1, &predOfSucc)
 			}
 		} else { //everything is fine
 			return
@@ -221,39 +274,39 @@ func (node *ChordNode) stabilize() {
 	me.id = node.id
 	me.ipaddr = node.ipaddr
 	msg = claimpredMsg(*me)
-	send(msg, node.successor.ipaddr)
+	send(msg, successor.ipaddr)
 
 }
 
 func (node *ChordNode) notify(newPred Finger) {
+	node.query(true, false, -1, &newPred)
 	//update predecessor
-	node.predecessor = new(Finger)
-	*node.predecessor = newPred
-	if node.successor == nil { //TODO: so if you get here, you were probably the first node.
-		node.successor = new(Finger)
-		*node.successor = newPred
-		node.fingerTable[1] = newPred
-		node.successorList[0] = newPred
+	successor := node.query(false, false, 1, nil)
+	if successor.zero() { //TODO: so if you get here, you were probably the first node.
+		node.query(true, false, 1, &newPred)
 	}
 	//notify applications
 }
 
 func (node *ChordNode) checkPred() {
 	//fmt.Printf("Checking predecessor.\n")
-	if node.predecessor == nil {
+	predecessor := node.query(false, false, -1, nil)
+	if predecessor.zero() {
 		return
 	}
 
 	msg := pingMsg()
-	reply, err := send(msg, node.predecessor.ipaddr)
+	reply, err := send(msg, predecessor.ipaddr)
 	if err != nil {
 		//fmt.Printf("Node %s setting pred back to nil.\n", node.ipaddr)
-		node.predecessor = nil
+		predecessor.ipaddr = ""
+		node.query(true, false, -1, &predecessor)
 	}
 
 	if success, err := parsePong(reply); !success || err != nil {
 		//fmt.Printf("Node %s setting pred back to nil.\n", node.ipaddr)
-		node.predecessor = nil
+		predecessor.ipaddr = ""
+		node.query(true, false, -1, &predecessor)
 	}
 
 	return
@@ -261,16 +314,17 @@ func (node *ChordNode) checkPred() {
 }
 
 func (node *ChordNode) fix(which int) {
-	//fmt.Printf("Node %s fixing finger %d\n.", node.fingerTable[0].String(), which)
-	if which == 0 || which == 1 || node.successor == nil {
+	successor := node.query(false, false, 1, nil)
+	if which == 0 || which == 1 || successor.zero() {
 		return
 	}
 	var targetId [sha256.Size]byte
 	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
 	//fmt.Printf("Node %s is looking for target %x.\n", node.ipaddr, targetId)
-	newip, err := Lookup(targetId, node.successor.ipaddr)
+	newip, err := Lookup(targetId, successor.ipaddr)
 	if err != nil { //node failed: TODO make more robust
-		newip, err = Lookup(targetId, node.successorList[1].ipaddr)
+		successor = node.query(false, true, 1, nil)
+		newip, err = Lookup(targetId, successor.ipaddr)
 	}
 	if err != nil || newip == node.ipaddr {
 		return
@@ -287,7 +341,8 @@ func (node *ChordNode) fix(which int) {
 	newfinger := new(Finger)
 	newfinger.ipaddr = newip
 	newfinger.id, _ = parseId(reply)
-	node.fingerTable[which] = *newfinger
+	//fmt.Printf("Node %s updating finger %d: %s.\n", node.ipaddr, which, newfinger.ipaddr)
+	node.query(true, false, which, newfinger)
 
 }
 
@@ -352,15 +407,27 @@ func (f Finger) String() string {
 	return fmt.Sprintf("%s", f.ipaddr)
 }
 
+func (f Finger) zero() bool {
+	if f.ipaddr == "" {
+		return true
+	} else {
+		return false
+	}
+}
+
+/** Printouts of information **/
+
 func (node *ChordNode) Info() string {
 	var succ, pred string
-	if node.successor != nil {
-		succ = node.successor.String()
+	successor := node.query(false, false, 1, nil)
+	predecessor := node.query(false, false, -1, nil)
+	if !successor.zero() {
+		succ = successor.String()
 	} else {
 		succ = "Unknown"
 	}
-	if node.predecessor != nil {
-		pred = node.predecessor.String()
+	if !predecessor.zero() {
+		pred = predecessor.String()
 	} else {
 		pred = "Unknown"
 	}
@@ -368,25 +435,35 @@ func (node *ChordNode) Info() string {
 }
 
 func (node *ChordNode) ShowFingers() string {
-	table := ""
-	for i, finger := range node.fingerTable {
-		if finger.ipaddr != "" {
-			if i == 0 || finger.ipaddr != node.fingerTable[i-1].ipaddr {
-				table += fmt.Sprintf("%s\n", finger.String())
+	retval := ""
+	finger := new(Finger)
+	prevfinger := new(Finger)
+	ctr := 0
+	for i := 0; i < sha256.Size+1; i++ {
+		*finger = node.query(false, false, i, nil)
+		if !finger.zero() {
+			ctr += 1
+			if i == 0 || finger.ipaddr != prevfinger.ipaddr {
+				retval += fmt.Sprintf("%s\n", finger.String())
 			}
 		}
+		*prevfinger = *finger
 	}
-	return table
+	return retval + fmt.Sprintf("Total fingers: %d.\n", ctr)
 }
 
 func (node *ChordNode) ShowSucc() string {
 	table := ""
-	for i, finger := range node.successorList {
+	finger := new(Finger)
+	prevfinger := new(Finger)
+	for i := 0; i < sha256.Size; i++ {
+		*finger = node.query(false, true, i, nil)
 		if finger.ipaddr != "" {
-			if i == 0 || finger.ipaddr != node.successorList[i-1].ipaddr {
+			if i == 0 || finger.ipaddr != prevfinger.ipaddr {
 				table += fmt.Sprintf("%s\n", finger.String())
 			}
 		}
+		*prevfinger = *finger
 	}
 	return table
 }

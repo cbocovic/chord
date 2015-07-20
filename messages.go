@@ -233,6 +233,7 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 	err := proto.Unmarshal(data, msg)
 	checkError(err)
 	if err != nil {
+		fmt.Printf("Uh oh in parse message of node %s\n", node.ipaddr)
 		return
 	}
 
@@ -261,7 +262,7 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		c <- sendidMsg(node.id[:32])
 		return
 	case cmd == NetworkMessage_Command_value["GetFingers"]:
-		table := make([]Finger, 33)
+		table := make([]Finger, 32*8+1)
 		for i := range table {
 			node.request <- Request{false, false, i}
 			f := <-node.finger
@@ -288,7 +289,7 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		//update finger table
 		return
 	case cmd == NetworkMessage_Command_value["GetSucc"]:
-		table := make([]Finger, 32)
+		table := make([]Finger, 32*8)
 		for i := range table {
 			node.request <- Request{false, true, i}
 			f := <-node.finger

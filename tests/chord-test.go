@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"github.com/cbocovic/chord"
 	"io"
+	"runtime"
 	"time"
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	//set up flags
 	numPtr := flag.Int("num", 2, "the size of the DHT you wish to test")

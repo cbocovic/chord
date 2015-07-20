@@ -19,7 +19,7 @@ func send(msg []byte, addr string) (reply []byte, err error) {
 		return
 	}
 
-	reply = make([]byte, 4096) //TODO: use framing here
+	reply = make([]byte, 100000) //TODO: use framing here
 	n, err := conn.Read(reply)
 	if err != nil {
 		return
@@ -64,20 +64,26 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 	defer conn.Close()
 
 	//Create data buffer of type byte slice
-	data := make([]byte, 4096) //TODO: use framing here
+	data := make([]byte, 100000) //TODO: use framing here
 	n, err := conn.Read(data)
 	if n >= 4095 {
 		fmt.Printf("Ran out of buffer room.\n")
 	}
 	checkError(err)
+	if err != nil {
+		fmt.Printf("Uh oh in handle message.\n")
+	}
 
 	c <- data[:n]
 
 	//wait for message to come back
 	response := <-c2
 
-	_, err = conn.Write(response)
+	n, err = conn.Write(response)
 	if err != nil {
 		return
+	}
+	if n > 100000 {
+		fmt.Printf("Uh oh. Wrote %d bytes.\n", n)
 	}
 }

@@ -44,7 +44,7 @@ type ChordNode struct {
 //error checking function
 func checkError(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		fmt.Fprintf(os.Stderr, "Fatal error: %s\n", err.Error())
 	}
 }
 
@@ -56,12 +56,16 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 
 	msg := getfingersMsg()
 	reply, err := send(msg, start)
+	checkError(err)
 	if err != nil { //node failed
+		fmt.Printf("Uh oh 0\n")
 		return
 	}
 
 	ft, err := parseFingers(reply)
+	checkError(err)
 	if err != nil {
+		fmt.Printf("Uh oh 1\n")
 		return
 	}
 	if len(ft) < 2 {
@@ -79,8 +83,10 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 			break
 		}
 		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
+			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
 			addr, err = Lookup(key, f.ipaddr)
 			if err != nil { //node failed
+				fmt.Printf("Uh oh 2\n")
 				continue
 			}
 			return
@@ -134,7 +140,7 @@ func Join(myaddr string, addr string) *ChordNode {
 	//update node info to include successor
 	succ := new(Finger)
 	succ.id, _ = parseId(reply)
-	fmt.Printf("Found successor: %x.\n", succ.id)
+	//fmt.Printf("Found successor: %x.\n", succ.id)
 	succ.ipaddr = successor
 	node.query(true, false, 1, succ)
 
@@ -203,7 +209,8 @@ func (node *ChordNode) maintain() {
 		node.checkPred()
 		//update fingers
 		node.fix(ctr)
-		ctr = (ctr + 1) % 256
+		ctr = ctr % 256
+		ctr += 1
 	}
 }
 
@@ -243,7 +250,7 @@ func (node *ChordNode) stabilize() {
 		return
 	}
 	for i := range ft {
-		if i < sha256.Size {
+		if i < sha256.Size*8-1 {
 			node.query(true, true, i+1, &ft[i])
 		}
 	}
@@ -280,6 +287,7 @@ func (node *ChordNode) stabilize() {
 
 func (node *ChordNode) notify(newPred Finger) {
 	node.query(true, false, -1, &newPred)
+	//fmt.Printf("Updating predecessor...\n")
 	//update predecessor
 	successor := node.query(false, false, 1, nil)
 	if successor.zero() { //TODO: so if you get here, you were probably the first node.
@@ -389,17 +397,22 @@ func target(me [sha256.Size]byte, which int) []byte {
 	powint := new(big.Int)
 	powint.SetInt64(int64(which - 1))
 
-	var biggest [sha256.Size]byte
+	var biggest [sha256.Size + 1]byte
 	for i := range biggest {
 		biggest[i] = 255
 	}
 
+	tmp := new(big.Int)
+	tmp.SetInt64(1)
+
 	modint := new(big.Int)
 	modint.SetBytes(biggest[:sha256.Size])
+	modint.Add(modint, tmp)
 
 	target := new(big.Int)
 	target.Exp(baseint, powint, modint)
 	target.Add(meint, target)
+	target.Mod(target, modint)
 	return target.Bytes()[:sha256.Size]
 }
 
@@ -439,7 +452,7 @@ func (node *ChordNode) ShowFingers() string {
 	finger := new(Finger)
 	prevfinger := new(Finger)
 	ctr := 0
-	for i := 0; i < sha256.Size+1; i++ {
+	for i := 0; i < sha256.Size*8+1; i++ {
 		*finger = node.query(false, false, i, nil)
 		if !finger.zero() {
 			ctr += 1
@@ -456,7 +469,7 @@ func (node *ChordNode) ShowSucc() string {
 	table := ""
 	finger := new(Finger)
 	prevfinger := new(Finger)
-	for i := 0; i < sha256.Size; i++ {
+	for i := 0; i < sha256.Size*8; i++ {
 		*finger = node.query(false, true, i, nil)
 		if finger.ipaddr != "" {
 			if i == 0 || finger.ipaddr != prevfinger.ipaddr {

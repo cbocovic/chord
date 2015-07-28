@@ -58,14 +58,12 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	reply, err := send(msg, start)
 	checkError(err)
 	if err != nil { //node failed
-		fmt.Printf("Uh oh 0\n")
 		return
 	}
 
 	ft, err := parseFingers(reply)
 	checkError(err)
 	if err != nil {
-		fmt.Printf("Uh oh 1\n")
 		return
 	}
 	if len(ft) < 2 {
@@ -86,7 +84,6 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
 			addr, err = Lookup(key, f.ipaddr)
 			if err != nil { //node failed
-				fmt.Printf("Uh oh 2\n")
 				continue
 			}
 			return

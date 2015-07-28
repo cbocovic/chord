@@ -13,7 +13,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	//set up flags
-	numPtr := flag.Int("num", 2, "the size of the DHT you wish to test")
+	numPtr := flag.Int("num", 100, "the size of the DHT you wish to test")
 
 	flag.Parse()
 	num := *numPtr

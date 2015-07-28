@@ -319,13 +319,15 @@ func parseFingers(data []byte) (ft []Finger, err error) {
 	}
 	sfmsg := chordmsg.GetSfmsg()
 	fingers := sfmsg.GetFingers()
+	prevfinger := new(Finger)
 	for _, finger := range fingers {
 		newfinger := new(Finger)
 		copy(newfinger.id[:], []byte(*finger.Id))
 		newfinger.ipaddr = *finger.Address
-		if newfinger.ipaddr != "" {
+		if newfinger.zero() && newfinger.ipaddr != prevfinger.ipaddr {
 			ft = append(ft, *newfinger)
 		}
+		*prevfinger = *newfinger
 	}
 	return
 }

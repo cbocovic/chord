@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"runtime/debug"
 	"time"
 )
 
@@ -69,11 +70,12 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	if err != nil {
 		return
 	}
+	//fmt.Printf("received %d finger(s).\n", len(ft))
 	if len(ft) < 2 {
 		return
 	}
 	if key == ft[0].id {
-		start = ft[0].ipaddr
+		addr = ft[0].ipaddr
 		return
 	}
 
@@ -86,6 +88,53 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
 			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
 			addr, err = Lookup(key, f.ipaddr)
+			if err != nil { //node failed
+				continue
+			}
+			return
+		}
+	}
+	addr = ft[1].ipaddr
+
+	return
+}
+
+//Lookup returns the address of the ChordNode that is responsible
+//for the key. The procedure begins at the address denoted by start.
+func (node *ChordNode) lookup(key [sha256.Size]byte, start string) (addr string, err error) {
+
+	addr = start
+
+	msg := getfingersMsg()
+	reply, err := node.send(msg, start)
+	checkError(err)
+	if err != nil { //node failed
+		return
+	}
+
+	ft, err := parseFingers(reply)
+	checkError(err)
+	if err != nil {
+		return
+	}
+	//fmt.Printf("received %d finger(s).\n", len(ft))
+	if len(ft) < 2 {
+		return
+	}
+	if key == ft[0].id {
+		addr = ft[0].ipaddr
+		return
+	}
+
+	//loop through finger table and see what the closest finger is
+	for i := len(ft) - 1; i > 0; i-- {
+		f := ft[i]
+		if i == 0 {
+			break
+		}
+		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
+			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
+			addr, err = node.lookup(key, f.ipaddr)
 			if err != nil { //node failed
 				continue
 			}
@@ -135,8 +184,13 @@ func Join(myaddr string, addr string) *ChordNode {
 	node := Create(myaddr)
 	fmt.Printf("Finished creating node. Now to join...\n")
 
+	fmt.Printf("looking up %x at %s.\n", node.id, addr)
 	successor, err := Lookup(node.id, addr)
 	checkError(err)
+	if successor == "" {
+		debug.PrintStack()
+		panic("in JOIN AHH")
+	}
 
 	//find id of node
 	msg := getidMsg()
@@ -335,10 +389,10 @@ func (node *ChordNode) fix(which int) {
 	var targetId [sha256.Size]byte
 	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
 	//fmt.Printf("Node %s is looking for target %x.\n", node.ipaddr, targetId)
-	newip, err := Lookup(targetId, successor.ipaddr)
+	newip, err := node.lookup(targetId, successor.ipaddr)
 	if err != nil { //node failed: TODO make more robust
 		successor = node.query(false, true, 1, nil)
-		newip, err = Lookup(targetId, successor.ipaddr)
+		newip, err = node.lookup(targetId, successor.ipaddr)
 	}
 	if err != nil || newip == node.ipaddr {
 		return

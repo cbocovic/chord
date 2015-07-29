@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime/debug"
 )
 
 //Send opens a connection to addr, sends msg, and then returns the
 //reply
 func send(msg []byte, addr string) (reply []byte, err error) {
+	if addr == "" {
+		debug.PrintStack()
+		panic("ahhh")
+	}
 
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -33,24 +38,26 @@ func send(msg []byte, addr string) (reply []byte, err error) {
 
 //send for a node checks existing open connections
 func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
+	if addr == "" {
+		debug.PrintStack()
+		panic("ahhh")
+	}
 
 	conn, ok := node.connections[addr]
 	if !ok {
-		fmt.Printf("Connection from %s to %s didn't exist. Creating new...\n", node.ipaddr, addr)
+		//fmt.Printf("Connection from %s to %s didn't exist. Creating new...\n", node.ipaddr, addr)
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
 			checkError(err)
 			return
 		}
 		node.connections[addr] = conn
-	} else {
-		fmt.Printf("Connection from %s to %s exists.\n", node.ipaddr, addr)
 	}
 
 	_, err = conn.Write(msg)
 	if err != nil {
 		//might have timed out
-		fmt.Printf("Connection from %s to %s is no good. Creating new...\n", node.ipaddr, addr)
+		//fmt.Printf("Connection from %s to %s is no good. Creating new...\n", node.ipaddr, addr)
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
 			checkError(err)
@@ -123,7 +130,6 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 			checkError(err)
 			return
 		}
-		fmt.Println("Read message.")
 
 		c <- data[:n]
 
@@ -137,6 +143,5 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 		if n > 100000 {
 			fmt.Printf("Uh oh. Wrote %d bytes.\n", n)
 		}
-		fmt.Println("Wrote response.")
 	}
 }

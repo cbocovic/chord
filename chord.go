@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"time"
 )
@@ -39,6 +40,8 @@ type ChordNode struct {
 
 	id     [sha256.Size]byte
 	ipaddr string
+
+	connections map[string]net.Conn
 }
 
 //error checking function
@@ -97,13 +100,9 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 //Create will start a new Chord ring and return the original ChordNode
 func Create(myaddr string) *ChordNode {
 	node := new(ChordNode)
-	//create id by hashing ipaddr
+	//initialize node information
 	node.id = sha256.Sum256([]byte(myaddr))
 	node.ipaddr = myaddr
-	c := make(chan Finger)
-	c2 := make(chan Request)
-	node.finger = c
-	node.request = c2
 	me := new(Finger)
 	me.id = node.id
 	me.ipaddr = node.ipaddr
@@ -112,8 +111,18 @@ func Create(myaddr string) *ChordNode {
 	node.successor = succ
 	pred := new(Finger)
 	node.predecessor = pred
-	fmt.Printf("Created node with id: %x\n", node.id)
+
+	//set up channels for finger manager
+	c := make(chan Finger)
+	c2 := make(chan Request)
+	node.finger = c
+	node.request = c2
+
+	//initialize listener and network manager threads
 	node.listen(myaddr)
+	node.connections = make(map[string]net.Conn)
+
+	//initialize maintenance and finger manager threads
 	go node.data()
 	go node.maintain()
 	fmt.Printf("Exiting create.\n")
@@ -223,7 +232,7 @@ func (node *ChordNode) stabilize() {
 
 	//check to see if successor is still around
 	msg := pingMsg()
-	reply, err := send(msg, successor.ipaddr)
+	reply, err := node.send(msg, successor.ipaddr)
 	if err != nil {
 		//successor failed to respond
 		successor = node.query(false, true, 1, nil)
@@ -238,7 +247,7 @@ func (node *ChordNode) stabilize() {
 
 	//everything is OK, update successor list
 	msg = getsuccessorsMsg()
-	reply, err = send(msg, successor.ipaddr)
+	reply, err = node.send(msg, successor.ipaddr)
 	if err != nil {
 		return
 	}
@@ -254,7 +263,7 @@ func (node *ChordNode) stabilize() {
 
 	//ask sucessor for predecessor
 	msg = getpredMsg()
-	reply, err = send(msg, successor.ipaddr)
+	reply, err = node.send(msg, successor.ipaddr)
 	if err != nil {
 		return
 	}
@@ -278,7 +287,7 @@ func (node *ChordNode) stabilize() {
 	me.id = node.id
 	me.ipaddr = node.ipaddr
 	msg = claimpredMsg(*me)
-	send(msg, successor.ipaddr)
+	node.send(msg, successor.ipaddr)
 
 }
 
@@ -301,7 +310,7 @@ func (node *ChordNode) checkPred() {
 	}
 
 	msg := pingMsg()
-	reply, err := send(msg, predecessor.ipaddr)
+	reply, err := node.send(msg, predecessor.ipaddr)
 	if err != nil {
 		//fmt.Printf("Node %s setting pred back to nil.\n", node.ipaddr)
 		predecessor.ipaddr = ""
@@ -338,7 +347,7 @@ func (node *ChordNode) fix(which int) {
 
 	//find id of node
 	msg := getidMsg()
-	reply, err := send(msg, newip)
+	reply, err := node.send(msg, newip)
 	if err != nil {
 		return
 	}

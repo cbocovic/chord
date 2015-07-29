@@ -51,14 +51,18 @@ Loop:
 			//print out finger table
 			fmt.Printf("Enter port of desired node: ")
 			fmt.Scan(&port)
-			node := list[port-8888]
-			fmt.Printf("\n%s", node.ShowFingers())
+			if port-8888 >= 0 && port-8888 < len(list) {
+				node := list[port-8888]
+				fmt.Printf("\n%s", node.ShowFingers())
+			}
 		case cmd == "succ":
 			//print out successor list
 			fmt.Printf("Enter port of desired node: ")
 			fmt.Scan(&port)
-			node := list[port-8888]
-			fmt.Printf("\n%s", node.ShowSucc())
+			if port-8888 >= 0 && port-8888 < len(list) {
+				node := list[port-8888]
+				fmt.Printf("\n%s", node.ShowSucc())
+			}
 		case err == io.EOF:
 			break Loop
 		}

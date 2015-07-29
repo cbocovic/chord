@@ -10,6 +10,7 @@ import (
 //Send opens a connection to addr, sends msg, and then returns the
 //reply
 func send(msg []byte, addr string) (reply []byte, err error) {
+
 	if addr == "" {
 		debug.PrintStack()
 		panic("ahhh")
@@ -20,6 +21,7 @@ func send(msg []byte, addr string) (reply []byte, err error) {
 		//TODO: look up conventions on errors for Go.
 		return
 	}
+	defer conn.Close()
 	_, err = conn.Write(msg)
 	if err != nil {
 		return
@@ -52,6 +54,7 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 			return
 		}
 		node.connections[addr] = conn
+		//fmt.Printf("node %s has %d connections.\n", node.ipaddr, len(node.connections))
 	}
 
 	_, err = conn.Write(msg)
@@ -113,7 +116,7 @@ func (node *ChordNode) listen(addr string) {
 func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 
 	//Close conenction when function exits
-	//defer conn.Close()
+	defer conn.Close()
 	for {
 
 		//Create data buffer of type byte slice

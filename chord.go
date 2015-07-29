@@ -490,7 +490,22 @@ func target(me [sha256.Size]byte, which int) []byte {
 	target.Exp(baseint, powint, modint)
 	target.Add(meint, target)
 	target.Mod(target, modint)
-	return target.Bytes()[:sha256.Size]
+
+	bytes := target.Bytes()
+	diff := sha256.Size - len(bytes)
+	if diff > 0 {
+		tmp := make([]byte, sha256.Size)
+		//pad with zeros
+		for i := 0; i < diff; i++ {
+			tmp[i] = 0
+		}
+		for i := diff; i < sha256.Size; i++ {
+			tmp[i] = bytes[i-diff]
+		}
+		fmt.Printf("Padded %x to %x.\n", bytes, tmp)
+		bytes = tmp
+	}
+	return bytes[:sha256.Size]
 }
 
 func (f Finger) String() string {

@@ -42,7 +42,8 @@ type ChordNode struct {
 	id     [sha256.Size]byte
 	ipaddr string
 
-	connections map[string]net.Conn
+	connections  map[string]net.Conn
+	applications map[byte]ChordApp
 }
 
 //error checking function
@@ -170,6 +171,7 @@ func Create(myaddr string) *ChordNode {
 	//initialize listener and network manager threads
 	node.listen(myaddr)
 	node.connections = make(map[string]net.Conn)
+	node.applications = make(map[byte]ChordApp)
 
 	//initialize maintenance and finger manager threads
 	go node.data()
@@ -345,6 +347,18 @@ func (node *ChordNode) stabilize() {
 
 }
 
+//Register allows chord applications to receive notifications
+//and messages through Chord
+func (node *ChordNode) Register(id byte, app ChordApp) bool {
+	if _, ok := node.applications[id]; ok {
+		fmt.Printf("Could not register application with id %d.\n", id)
+		return false
+	}
+	node.applications[id] = app
+	return true
+
+}
+
 func (node *ChordNode) notify(newPred Finger) {
 	node.query(true, false, -1, &newPred)
 	//fmt.Printf("Updating predecessor...\n")
@@ -354,6 +368,9 @@ func (node *ChordNode) notify(newPred Finger) {
 		node.query(true, false, 1, &newPred)
 	}
 	//notify applications
+	for _, app := range node.applications {
+		app.Notify(newPred.id[:32], node.id[:32])
+	}
 }
 
 func (node *ChordNode) checkPred() {
@@ -539,4 +556,10 @@ func (node *ChordNode) ShowSucc() string {
 		*prevfinger = *finger
 	}
 	return table
+}
+
+/** Chord application interface and methods **/
+type ChordApp interface {
+	Notify(id []byte, me []byte) string
+	Message(addr string, data string) string
 }

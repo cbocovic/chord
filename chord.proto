@@ -17,9 +17,12 @@ message SendFingersMessage {
 	repeated FingerMessage fingers = 1;
 }
 
-message NetworkMessage {
-	required uint32 proto = 1;
-	optional ChordMessage msg = 2;
+
+message ChordMessage {
+	required Command cmd = 1;
+	optional PredMessage cpmsg = 2;
+	optional SendIdMessage sidmsg = 4;
+	optional SendFingersMessage sfmsg = 5;
 
 	enum Command {
 		Ping = 1;
@@ -30,12 +33,9 @@ message NetworkMessage {
 		ClaimPred = 6;
 		GetSucc = 7;
 	};
+}
 
-	message ChordMessage {
-		required Command cmd = 1;
-		optional PredMessage cpmsg = 2;
-		optional SendIdMessage sidmsg = 4;
-		optional SendFingersMessage sfmsg = 5;
-	}
-
+message NetworkMessage {
+	required uint32 proto = 1;
+	optional string msg = 2;
 }

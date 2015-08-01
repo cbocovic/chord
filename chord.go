@@ -60,7 +60,7 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	addr = start
 
 	msg := getfingersMsg()
-	reply, err := send(msg, start)
+	reply, err := Send(msg, start)
 	checkError(err)
 	if err != nil { //node failed
 		return
@@ -196,7 +196,7 @@ func Join(myaddr string, addr string) *ChordNode {
 
 	//find id of node
 	msg := getidMsg()
-	reply, err := send(msg, successor)
+	reply, err := Send(msg, successor)
 	checkError(err)
 
 	//update node info to include successor
@@ -576,5 +576,5 @@ func (node *ChordNode) ShowSucc() string {
 /** Chord application interface and methods **/
 type ChordApp interface {
 	Notify(id []byte, me []byte) string
-	Message(addr string, data string) string
+	Message(data []byte) []byte
 }

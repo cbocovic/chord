@@ -9,7 +9,7 @@ import (
 
 //Send opens a connection to addr, sends msg, and then returns the
 //reply
-func send(msg []byte, addr string) (reply []byte, err error) {
+func Send(msg []byte, addr string) (reply []byte, err error) {
 
 	if addr == "" {
 		debug.PrintStack()

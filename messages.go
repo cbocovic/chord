@@ -338,8 +338,8 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		node.request <- Request{false, false, -1}
 		pred := <-node.finger
 
-		if pred.zero() || inRange(newPred.id, pred.id, node.id) {
-			node.notify(newPred)
+		if pred.zero() || InRange(newPred.id, pred.id, node.id) {
+			go node.notify(newPred)
 		}
 		c <- nullMsg()
 		//update finger table

@@ -17,6 +17,7 @@ func Send(msg []byte, addr string) (reply []byte, err error) {
 	}
 
 	conn, err := net.Dial("tcp", addr)
+	checkError(err)
 	if err != nil {
 		//TODO: look up conventions on errors for Go.
 		return
@@ -107,6 +108,7 @@ func (node *ChordNode) listen(addr string) {
 			if conn, err := listener.Accept(); err == nil {
 				go handleMessage(conn, c, c2)
 			} else {
+				checkError(err)
 				continue
 			}
 		}

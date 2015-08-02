@@ -71,7 +71,6 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	if err != nil {
 		return
 	}
-	//fmt.Printf("received %d finger(s).\n", len(ft))
 	if len(ft) < 2 {
 		return
 	}
@@ -86,7 +85,7 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 		if i == 0 {
 			break
 		}
-		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
+		if InRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
 			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
 			addr, err = Lookup(key, f.ipaddr)
 			if err != nil { //node failed
@@ -133,7 +132,7 @@ func (node *ChordNode) lookup(key [sha256.Size]byte, start string) (addr string,
 		if i == 0 {
 			break
 		}
-		if inRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
+		if InRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
 			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
 			addr, err = node.lookup(key, f.ipaddr)
 			if err != nil { //node failed
@@ -330,7 +329,7 @@ func (node *ChordNode) stabilize() {
 	}
 	if predOfSucc.ipaddr != "" {
 		if predOfSucc.id != node.id {
-			if inRange(predOfSucc.id, node.id, successor.id) {
+			if InRange(predOfSucc.id, node.id, successor.id) {
 				node.query(true, false, 1, &predOfSucc)
 			}
 		} else { //everything is fine
@@ -369,7 +368,8 @@ func (node *ChordNode) notify(newPred Finger) {
 	}
 	//notify applications
 	for _, app := range node.applications {
-		app.Notify(newPred.id[:32], node.id[:32])
+		fmt.Printf("Notifying application...\n")
+		app.Notify(newPred.id, node.id)
 	}
 }
 
@@ -437,8 +437,8 @@ func (node *ChordNode) Finalize() {
 	fmt.Printf("Exiting...\n")
 }
 
-//inRange checks to see if the value x is in (min, max)
-func inRange(x [sha256.Size]byte, min [sha256.Size]byte, max [sha256.Size]byte) bool {
+//InRange checks to see if the value x is in (min, max)
+func InRange(x [sha256.Size]byte, min [sha256.Size]byte, max [sha256.Size]byte) bool {
 	//There are 3 cases: min < x and x < max,
 	//x < max and max < min, max < min and min < x
 	xint := new(big.Int)
@@ -575,6 +575,6 @@ func (node *ChordNode) ShowSucc() string {
 
 /** Chord application interface and methods **/
 type ChordApp interface {
-	Notify(id []byte, me []byte) string
+	Notify(id [sha256.Size]byte, me [sha256.Size]byte)
 	Message(data []byte) []byte
 }

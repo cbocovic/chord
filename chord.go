@@ -42,7 +42,7 @@ type ChordNode struct {
 	id     [sha256.Size]byte
 	ipaddr string
 
-	connections  map[string]net.Conn
+	connections  map[string]net.TCPConn
 	applications map[byte]ChordApp
 }
 
@@ -169,7 +169,7 @@ func Create(myaddr string) *ChordNode {
 
 	//initialize listener and network manager threads
 	node.listen(myaddr)
-	node.connections = make(map[string]net.Conn)
+	node.connections = make(map[string]net.TCPConn)
 	node.applications = make(map[byte]ChordApp)
 
 	//initialize maintenance and finger manager threads
@@ -263,7 +263,7 @@ func (node *ChordNode) maintain() {
 	fmt.Printf("Node %s maintaining.\n", node.ipaddr)
 	ctr := 0
 	for {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(30 * time.Second)
 		//stabilize
 		node.stabilize()
 		//check predecessor

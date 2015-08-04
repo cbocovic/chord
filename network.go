@@ -5,6 +5,8 @@ import (
 	"io"
 	"net"
 	"runtime/debug"
+	"strconv"
+	"strings"
 )
 
 //Send opens a connection to addr, sends msg, and then returns the
@@ -16,7 +18,22 @@ func Send(msg []byte, addr string) (reply []byte, err error) {
 		panic("ahhh")
 	}
 
-	conn, err := net.Dial("tcp", addr)
+	laddr := new(net.TCPAddr)
+	laddr.IP = net.ParseIP("127.0.0.1")
+	laddr.Port = 0
+	if err != nil {
+		checkError(err)
+		return
+	}
+	raddr := new(net.TCPAddr)
+	raddr.IP = net.ParseIP(strings.Split(addr, ":")[0])
+	raddr.Port, err = strconv.Atoi(strings.Split(addr, ":")[1])
+	if err != nil {
+		checkError(err)
+		return
+	}
+	newconn, err := net.DialTCP("tcp", laddr, raddr)
+	conn := *newconn
 	checkError(err)
 	if err != nil {
 		//TODO: look up conventions on errors for Go.
@@ -49,11 +66,26 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 	conn, ok := node.connections[addr]
 	if !ok {
 		//fmt.Printf("Connection from %s to %s didn't exist. Creating new...\n", node.ipaddr, addr)
-		conn, err = net.Dial("tcp", addr)
+		laddr := new(net.TCPAddr)
+		laddr.IP = net.ParseIP(strings.Split(node.ipaddr, ":")[0])
+		laddr.Port = 0
 		if err != nil {
 			checkError(err)
 			return
 		}
+		raddr := new(net.TCPAddr)
+		raddr.IP = net.ParseIP(strings.Split(addr, ":")[0])
+		raddr.Port, err = strconv.Atoi(strings.Split(addr, ":")[1])
+		if err != nil {
+			checkError(err)
+			return
+		}
+		newconn, nerr := net.DialTCP("tcp", laddr, raddr)
+		if nerr != nil {
+			checkError(nerr)
+			return
+		}
+		conn = *newconn
 		node.connections[addr] = conn
 		//fmt.Printf("node %s has %d connections.\n", node.ipaddr, len(node.connections))
 	}
@@ -62,11 +94,26 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 	if err != nil {
 		//might have timed out
 		//fmt.Printf("Connection from %s to %s is no good. Creating new...\n", node.ipaddr, addr)
-		conn, err = net.Dial("tcp", addr)
+		laddr := new(net.TCPAddr)
+		laddr.IP = net.ParseIP(strings.Split(node.ipaddr, ":")[0])
+		laddr.Port = 0
 		if err != nil {
 			checkError(err)
 			return
 		}
+		raddr := new(net.TCPAddr)
+		raddr.IP = net.ParseIP(strings.Split(addr, ":")[0])
+		raddr.Port, err = strconv.Atoi(strings.Split(addr, ":")[1])
+		if err != nil {
+			checkError(err)
+			return
+		}
+		newconn, nerr := net.DialTCP("tcp", laddr, raddr)
+		if nerr != nil {
+			checkError(nerr)
+			return
+		}
+		conn = *newconn
 		_, err = conn.Write(msg)
 		if err != nil {
 			checkError(err)
@@ -100,12 +147,15 @@ func (node *ChordNode) listen(addr string) {
 	}()
 
 	//listen to TCP port
-	listener, err := net.Listen("tcp", addr)
+	laddr := new(net.TCPAddr)
+	laddr.IP = net.ParseIP(strings.Split(addr, ":")[0])
+	laddr.Port, _ = strconv.Atoi(strings.Split(addr, ":")[1])
+	listener, err := net.ListenTCP("tcp", laddr)
 	checkError(err)
 	go func() {
 		defer fmt.Printf("No longer listening...\n")
 		for {
-			if conn, err := listener.Accept(); err == nil {
+			if conn, err := listener.AcceptTCP(); err == nil {
 				go handleMessage(conn, c, c2)
 			} else {
 				checkError(err)

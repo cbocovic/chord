@@ -1,8 +1,8 @@
 #!/bin/bash
 
-for i in {0..4}; do
-	var=$((8888+$i*2))
+for i in {1..5}; do
+	var=$(($i*1))
 	echo $var
-	screen -dmS "tests$i" tests -num 2 -start $var
+	screen -dmS "$i-tests" ./tests -start $var
 	sleep 2
 done

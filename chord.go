@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"net"
 	"os"
 	"runtime/debug"
@@ -44,6 +45,9 @@ type ChordNode struct {
 
 	connections  map[string]net.TCPConn
 	applications map[byte]ChordApp
+
+	//testing purposes only
+	malicious byte
 }
 
 //error checking function
@@ -86,7 +90,6 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 			break
 		}
 		if InRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
-			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
 			addr, err = Lookup(key, f.ipaddr)
 			if err != nil { //node failed
 				continue
@@ -263,7 +266,7 @@ func (node *ChordNode) maintain() {
 	fmt.Printf("Node %s maintaining.\n", node.ipaddr)
 	ctr := 0
 	for {
-		time.Sleep(30 * time.Second)
+		time.Sleep(time.Duration(rand.Uint32()%60)*time.Second + time.Duration(rand.Uint32()%60)*time.Millisecond)
 		//stabilize
 		node.stabilize()
 		//check predecessor
@@ -290,6 +293,8 @@ func (node *ChordNode) stabilize() {
 	reply, err := node.send(msg, successor.ipaddr)
 	if err != nil {
 		//successor failed to respond
+		fmt.Printf("Successor failed to respond.\n")
+		checkError(err)
 		successor = node.query(false, true, 1, nil)
 		node.query(true, false, 1, &successor)
 		if successor.ipaddr == node.ipaddr {
@@ -369,7 +374,7 @@ func (node *ChordNode) notify(newPred Finger) {
 	//notify applications
 	for _, app := range node.applications {
 		fmt.Printf("Notifying application...\n")
-		app.Notify(newPred.id, node.id)
+		app.Notify(newPred.id, node.id, newPred.ipaddr)
 	}
 }
 
@@ -383,13 +388,13 @@ func (node *ChordNode) checkPred() {
 	msg := pingMsg()
 	reply, err := node.send(msg, predecessor.ipaddr)
 	if err != nil {
-		//fmt.Printf("Node %s setting pred back to nil.\n", node.ipaddr)
+		fmt.Printf("Node %s could not contact pred. setting pred back to nil.\n", node.ipaddr)
 		predecessor.ipaddr = ""
 		node.query(true, false, -1, &predecessor)
 	}
 
 	if success, err := parsePong(reply); !success || err != nil {
-		//fmt.Printf("Node %s setting pred back to nil.\n", node.ipaddr)
+		fmt.Printf("Node %s could not parse pong. setting pred back to nil.\n", node.ipaddr)
 		predecessor.ipaddr = ""
 		node.query(true, false, -1, &predecessor)
 	}
@@ -403,6 +408,7 @@ func (node *ChordNode) fix(which int) {
 	if which == 0 || which == 1 || successor.zero() {
 		return
 	}
+	fmt.Printf("Fixing finger %d at %s.\n", which, time.Now().String())
 	var targetId [sha256.Size]byte
 	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
 	//fmt.Printf("Node %s is looking for target %x.\n", node.ipaddr, targetId)
@@ -575,6 +581,6 @@ func (node *ChordNode) ShowSucc() string {
 
 /** Chord application interface and methods **/
 type ChordApp interface {
-	Notify(id [sha256.Size]byte, me [sha256.Size]byte)
+	Notify(id [sha256.Size]byte, me [sha256.Size]byte, addr string)
 	Message(data []byte) []byte
 }

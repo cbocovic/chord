@@ -6,7 +6,7 @@ import (
 	"github.com/cbocovic/chord"
 	"io"
 	//"runtime"
-	//"time"
+	"time"
 )
 
 func main() {
@@ -15,11 +15,11 @@ func main() {
 	var startaddr string
 
 	//set up flags
-	//numPtr := flag.Int("num", 2, "the size of the DHT you wish to test")
+	numPtr := flag.Int("num", 1, "the size of the DHT you wish to test")
 	startPtr := flag.Int("start", 1, "ipaddr to start from")
 
 	flag.Parse()
-	//num := *numPtr
+	num := *numPtr
 	start := *startPtr
 
 	low := (1 + start) % 256
@@ -29,7 +29,7 @@ func main() {
 
 	fmt.Printf("Joining %d server starting at %s!\n", 1, startaddr)
 
-	list := make([]*chord.ChordNode, 1) //num)
+	list := make([]*chord.ChordNode, num) //num)
 	if start == 1 {
 
 		me := new(chord.ChordNode)
@@ -41,15 +41,20 @@ func main() {
 		list[0] = me
 	}
 
-	/*for i := 1; i < num; i++ {
+	for i := 1; i < num; i++ {
 		//join node to network or start a new network
 		time.Sleep(time.Second)
 		node := new(chord.ChordNode)
-		addr := fmt.Sprintf("127.0.%d.0:8888", start+i)
+		low := (1 + start + i) % 256
+		middle := ((1 + start + i) / 256) % 256
+		high := ((1 + start + i) / (256 * 256)) % 256
+		addr := fmt.Sprintf("127.%d.%d.%d:8888", high, middle, low)
+
+		fmt.Printf("Joining %d server starting at %s!\n", 1, addr)
 		node = chord.Join(addr, startaddr)
 		list[i] = node
 		fmt.Printf("Joined server: %s.\n", addr)
-	}*/
+	}
 	//block until receive input
 Loop:
 	for {

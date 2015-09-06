@@ -34,6 +34,9 @@ func Send(msg []byte, addr string) (reply []byte, err error) {
 		return
 	}
 	newconn, err := net.DialTCP("tcp", laddr, raddr)
+	if err != nil {
+		return
+	}
 	conn := *newconn
 	checkError(err)
 	if err != nil {
@@ -89,7 +92,7 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 			checkError(nerr)
 			return
 		}
-		err = newconn.SetDeadline(time.Now().Add(2 * time.Minute))
+		err = newconn.SetDeadline(time.Now().Add(3 * time.Minute))
 		checkError(err)
 		conn = *newconn
 		node.connections[addr] = conn
@@ -97,6 +100,7 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 	}
 
 	_, err = conn.Write(msg)
+	err = conn.SetDeadline(time.Now().Add(3 * time.Minute))
 	if err != nil {
 		//might have timed out
 		//fmt.Printf("Connection from %s to %s is no good. Creating new...\n", node.ipaddr, addr)
@@ -118,7 +122,7 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 			checkError(nerr)
 			return
 		}
-		err = newconn.SetDeadline(time.Now().Add(2 * time.Minute))
+		err = newconn.SetDeadline(time.Now().Add(3 * time.Minute))
 		checkError(err)
 		conn = *newconn
 		_, err = conn.Write(msg)
@@ -132,6 +136,7 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 
 	reply = make([]byte, 100000) //TODO: use framing here
 	n, err := conn.Read(reply)
+	err = conn.SetDeadline(time.Now().Add(3 * time.Minute))
 	if err != nil {
 		fmt.Printf("Uh oh (2) ... ")
 		checkError(err)
@@ -185,6 +190,7 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 
 		//Create data buffer of type byte slice
 		data := make([]byte, 100000) //TODO: use framing here
+		err := conn.SetDeadline(time.Now().Add(3 * time.Minute))
 		n, err := conn.Read(data)
 		if n >= 4095 {
 			fmt.Printf("Ran out of buffer room.\n")
@@ -203,6 +209,7 @@ func handleMessage(conn net.Conn, c chan []byte, c2 chan []byte) {
 		//wait for message to come back
 		response := <-c2
 
+		err = conn.SetDeadline(time.Now().Add(3 * time.Minute))
 		n, err = conn.Write(response)
 		if err != nil {
 			fmt.Printf("Uh oh (3).. ")

@@ -65,8 +65,9 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 
 	msg := getfingersMsg()
 	reply, err := Send(msg, start)
-	checkError(err)
-	if err != nil { //node failed
+	if err != nil { //node failed.
+		fmt.Printf("Error in lookup: ")
+		checkError(err)
 		return
 	}
 
@@ -78,8 +79,11 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	if len(ft) < 2 {
 		return
 	}
-	if key == ft[0].id {
-		addr = ft[0].ipaddr
+
+	current := ft[0]
+
+	if key == current.id {
+		addr = current.ipaddr
 		return
 	}
 
@@ -89,7 +93,7 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 		if i == 0 {
 			break
 		}
-		if InRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
+		if InRange(f.id, current.id, key) { //see if f.id is closer than I am.
 			addr, err = Lookup(key, f.ipaddr)
 			if err != nil { //node failed
 				continue
@@ -98,6 +102,41 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 		}
 	}
 	addr = ft[1].ipaddr
+	msg = pingMsg()
+	reply, err = Send(msg, addr)
+
+	//this code is executed if the id's successor has gone missing
+	if err != nil {
+		//ask node for its successor list
+		msg = getsuccessorsMsg()
+		reply, err = Send(msg, current.ipaddr)
+		if err != nil {
+			addr = current.ipaddr
+			return
+		}
+
+		ft, err = parseFingers(reply)
+		if err != nil {
+			addr = current.ipaddr
+			return
+		}
+
+		for i := 0; i < len(ft); i++ {
+			f := ft[i]
+			if i == 0 {
+				break
+			}
+			msg = pingMsg()
+			reply, err = Send(msg, f.ipaddr)
+			if err != nil { //closest next successor that responds
+				addr = f.ipaddr
+				return
+			}
+		}
+
+		addr = current.ipaddr
+		return
+	}
 
 	return
 }
@@ -124,8 +163,11 @@ func (node *ChordNode) lookup(key [sha256.Size]byte, start string) (addr string,
 	if len(ft) < 2 {
 		return
 	}
-	if key == ft[0].id {
-		addr = ft[0].ipaddr
+
+	current := ft[0]
+
+	if key == current.id {
+		addr = current.ipaddr
 		return
 	}
 
@@ -135,7 +177,7 @@ func (node *ChordNode) lookup(key [sha256.Size]byte, start string) (addr string,
 		if i == 0 {
 			break
 		}
-		if InRange(f.id, ft[0].id, key) { //see if f.id is closer than I am.
+		if InRange(f.id, current.id, key) { //see if f.id is closer than I am.
 			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
 			addr, err = node.lookup(key, f.ipaddr)
 			if err != nil { //node failed
@@ -144,7 +186,41 @@ func (node *ChordNode) lookup(key [sha256.Size]byte, start string) (addr string,
 			return
 		}
 	}
-	addr = ft[1].ipaddr
+	addr = current.ipaddr
+	msg = pingMsg()
+	reply, err = node.send(msg, addr)
+
+	//this code is executed if the id's successor has gone missing
+	if err != nil {
+		//ask node for its successor list
+		msg = getsuccessorsMsg()
+		reply, err = node.send(msg, current.ipaddr)
+		if err != nil {
+			addr = current.ipaddr
+			return
+		}
+		ft, err = parseFingers(reply)
+		if err != nil {
+			addr = current.ipaddr
+			return
+		}
+
+		for i := 0; i < len(ft); i++ {
+			f := ft[i]
+			if i == 0 {
+				break
+			}
+			msg = pingMsg()
+			reply, err = node.send(msg, f.ipaddr)
+			if err != nil { //closest next successor that responds
+				addr = f.ipaddr
+				return
+			}
+		}
+
+		addr = current.ipaddr
+		return
+	}
 
 	return
 }
@@ -542,7 +618,7 @@ func (node *ChordNode) Info() string {
 	} else {
 		pred = "Unknown"
 	}
-	return fmt.Sprintf("%x\t%s\t%s\n", node.id, succ, pred)
+	return fmt.Sprintf("%s\t%s\t%s\n", node.ipaddr, succ, pred)
 }
 
 func (node *ChordNode) ShowFingers() string {

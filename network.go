@@ -10,9 +10,11 @@ import (
 	"time"
 )
 
-//Send opens a connection to addr, sends msg, and then returns the
-//reply
+//Send is a helper function for sending a message to a peer in the Chord DHT.
+//It opens a connection to the Chord node with the IP address addr,
+//sends the message msg, and waits for a reply
 func Send(msg []byte, addr string) (reply []byte, err error) {
+	//TODO: return error if reply took too long
 
 	if addr == "" {
 		debug.PrintStack()
@@ -23,14 +25,12 @@ func Send(msg []byte, addr string) (reply []byte, err error) {
 	laddr.IP = net.ParseIP("127.0.0.1")
 	laddr.Port = 0
 	if err != nil {
-		checkError(err)
 		return
 	}
 	raddr := new(net.TCPAddr)
 	raddr.IP = net.ParseIP(strings.Split(addr, ":")[0])
 	raddr.Port, err = strconv.Atoi(strings.Split(addr, ":")[1])
 	if err != nil {
-		checkError(err)
 		return
 	}
 	newconn, err := net.DialTCP("tcp", laddr, raddr)
@@ -40,7 +40,6 @@ func Send(msg []byte, addr string) (reply []byte, err error) {
 	conn := *newconn
 	checkError(err)
 	if err != nil {
-		//TODO: look up conventions on errors for Go.
 		return
 	}
 	defer conn.Close()
@@ -74,22 +73,17 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 		laddr.IP = net.ParseIP(strings.Split(node.ipaddr, ":")[0])
 		laddr.Port = 0
 		if err != nil {
-			fmt.Printf("1 ")
-			checkError(err)
 			return
 		}
 		raddr := new(net.TCPAddr)
 		raddr.IP = net.ParseIP(strings.Split(addr, ":")[0])
 		raddr.Port, err = strconv.Atoi(strings.Split(addr, ":")[1])
 		if err != nil {
-			fmt.Printf("2 ")
-			checkError(err)
 			return
 		}
 		newconn, nerr := net.DialTCP("tcp", laddr, raddr)
 		if nerr != nil {
-			fmt.Printf("3 ")
-			checkError(nerr)
+			err = nerr
 			return
 		}
 		err = newconn.SetDeadline(time.Now().Add(3 * time.Minute))
@@ -100,7 +94,7 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 	}
 
 	_, err = conn.Write(msg)
-	err = conn.SetDeadline(time.Now().Add(3 * time.Minute))
+	conn.SetDeadline(time.Now().Add(3 * time.Minute))
 	if err != nil {
 		//might have timed out
 		//fmt.Printf("Connection from %s to %s is no good. Creating new...\n", node.ipaddr, addr)
@@ -112,14 +106,11 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 		raddr.IP = net.ParseIP(strings.Split(addr, ":")[0])
 		raddr.Port, err = strconv.Atoi(strings.Split(addr, ":")[1])
 		if err != nil {
-			fmt.Printf("5 ")
-			checkError(err)
 			return
 		}
 		newconn, nerr := net.DialTCP("tcp", laddr, raddr)
 		if nerr != nil {
-			fmt.Printf("6 ")
-			checkError(nerr)
+			err = nerr
 			return
 		}
 		err = newconn.SetDeadline(time.Now().Add(3 * time.Minute))
@@ -127,8 +118,6 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 		conn = *newconn
 		_, err = conn.Write(msg)
 		if err != nil {
-			fmt.Printf("Uh oh (1).. ")
-			checkError(err)
 			return
 		}
 		node.connections[addr] = conn
@@ -136,10 +125,8 @@ func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 
 	reply = make([]byte, 100000) //TODO: use framing here
 	n, err := conn.Read(reply)
-	err = conn.SetDeadline(time.Now().Add(3 * time.Minute))
+	conn.SetDeadline(time.Now().Add(3 * time.Minute))
 	if err != nil {
-		fmt.Printf("Uh oh (2) ... ")
-		checkError(err)
 		return
 	}
 	reply = reply[:n]

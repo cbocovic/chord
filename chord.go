@@ -22,7 +22,7 @@ type Finger struct {
 	ipaddr string
 }
 
-type Request struct {
+type request struct {
 	write bool
 	succ  bool
 	index int
@@ -36,7 +36,7 @@ type ChordNode struct {
 	fingerTable   [sha256.Size*8 + 1]Finger
 
 	finger  chan Finger
-	request chan Request
+	request chan request
 
 	id     [sha256.Size]byte
 	ipaddr string
@@ -118,7 +118,6 @@ func Lookup(key [sha256.Size]byte, start string) (addr string, err error) {
 	//this code is executed if the current node's successor has gone missing
 	if err != nil {
 		//ask node for its successor list
-		fmt.Printf("Lookup: had to ask for successor list.\n")
 		msg = getsuccessorsMsg()
 		reply, err = Send(msg, current.ipaddr)
 		if err != nil {
@@ -170,7 +169,6 @@ func (node *ChordNode) lookup(key [sha256.Size]byte, start string) (addr string,
 		err = &PeerError{start, err}
 		return
 	}
-	//fmt.Printf("received %d finger(s).\n", len(ft))
 	if len(ft) < 2 {
 		return
 	}
@@ -189,7 +187,6 @@ func (node *ChordNode) lookup(key [sha256.Size]byte, start string) (addr string,
 			break
 		}
 		if InRange(f.id, current.id, key) { //see if f.id is closer than I am.
-			//fmt.Printf("Key %x: found closer node: %s.\n", key, f.ipaddr)
 			addr, err = node.lookup(key, f.ipaddr)
 			if err != nil { //node failed
 				continue
@@ -204,7 +201,6 @@ func (node *ChordNode) lookup(key [sha256.Size]byte, start string) (addr string,
 	//this code is executed if the id's successor has gone missing
 	if err != nil {
 		//ask node for its successor list
-		fmt.Printf("Lookup: had to ask for successor list.\n")
 		msg = getsuccessorsMsg()
 		reply, err = node.send(msg, current.ipaddr)
 		if err != nil {
@@ -254,7 +250,7 @@ func Create(myaddr string) *ChordNode {
 
 	//set up channels for finger manager
 	c := make(chan Finger)
-	c2 := make(chan Request)
+	c2 := make(chan request)
 	node.finger = c
 	node.request = c2
 
@@ -266,7 +262,6 @@ func Create(myaddr string) *ChordNode {
 	//initialize maintenance and finger manager threads
 	go node.data()
 	go node.maintain()
-	fmt.Printf("Exiting create.\n")
 	return node
 }
 
@@ -277,9 +272,6 @@ func Create(myaddr string) *ChordNode {
 //If the start address is unreachable, the error is of type PeerError.
 func Join(myaddr string, addr string) (*ChordNode, error) {
 	node := Create(myaddr)
-	fmt.Printf("Finished creating node. Now to join...\n")
-
-	fmt.Printf("looking up %x at %s.\n", node.id, addr)
 	successor, err := Lookup(node.id, addr)
 	if err != nil || successor == "" {
 		return nil, &PeerError{addr, err}
@@ -298,7 +290,6 @@ func Join(myaddr string, addr string) (*ChordNode, error) {
 	if err != nil {
 		return nil, &PeerError{addr, err}
 	}
-	//fmt.Printf("Found successor: %x.\n", succ.id)
 	succ.ipaddr = successor
 	node.query(true, false, 1, succ)
 
@@ -307,10 +298,8 @@ func Join(myaddr string, addr string) (*ChordNode, error) {
 
 //data manages reads and writes to the node data structure
 func (node *ChordNode) data() {
-	//fmt.Printf("Node %s data manager is ready.\n", node.ipaddr)
 	for {
 		req := <-node.request
-		//fmt.Printf("Node %s processing query.\n", node.ipaddr)
 		if req.write {
 			if req.succ {
 				node.successorList[req.index] = <-node.finger
@@ -342,22 +331,19 @@ func (node *ChordNode) data() {
 //query allows functions to read from or write to the node object
 func (node *ChordNode) query(write bool, succ bool, index int, newf *Finger) Finger {
 	f := new(Finger)
-	req := Request{write, succ, index}
+	req := request{write, succ, index}
 	node.request <- req
-	//fmt.Printf("Node %s sent query.\n", node.ipaddr)
 	if write {
 		node.finger <- *newf
 	} else {
 		*f = <-node.finger
 	}
 
-	//fmt.Printf("Node %s has received query response.\n", node.ipaddr)
 	return *f
 }
 
 //maintain will periodically perform maintenance operations
 func (node *ChordNode) maintain() {
-	fmt.Printf("Node %s maintaining.\n", node.ipaddr)
 	ctr := 0
 	for {
 		time.Sleep(time.Duration(rand.Uint32()%60)*time.Second + time.Duration(rand.Uint32()%60)*time.Millisecond)
@@ -375,20 +361,17 @@ func (node *ChordNode) maintain() {
 //stablize ensures that the node's successor's predecessor is itself
 //If not, it updates its successor's predecessor.
 func (node *ChordNode) stabilize() {
-	fmt.Printf("Node %s is stabilizing...\n", node.ipaddr)
 	successor := node.query(false, false, 1, nil)
 
 	if successor.zero() {
 		return
 	}
 
-	fmt.Printf("Sending message to successor: %s.\n", successor.ipaddr)
 	//check to see if successor is still around
 	msg := pingMsg()
 	reply, err := node.send(msg, successor.ipaddr)
 	if err != nil {
 		//successor failed to respond
-		fmt.Printf("Successor failed to respond. Checking for next available successor... ")
 		//check in successor list for next available successor.
 		for i := 1; i < sha256.Size*8; i++ {
 			successor = node.query(false, true, i, nil)
@@ -405,10 +388,8 @@ func (node *ChordNode) stabilize() {
 		}
 		node.query(true, false, 1, &successor)
 		if successor.ipaddr == "" {
-			fmt.Printf("None available.\n")
 			return
 		}
-		fmt.Printf("New successor: %s.\n", successor.ipaddr)
 	}
 
 	//everything is OK, update successor list
@@ -465,7 +446,6 @@ func (node *ChordNode) stabilize() {
 //be notified of any changes in the underlying node's predecessor.
 func (node *ChordNode) Register(id byte, app ChordApp) bool {
 	if _, ok := node.applications[id]; ok {
-		fmt.Printf("Could not register application with id %d.\n", id)
 		return false
 	}
 	node.applications[id] = app
@@ -475,7 +455,6 @@ func (node *ChordNode) Register(id byte, app ChordApp) bool {
 
 func (node *ChordNode) notify(newPred Finger) {
 	node.query(true, false, -1, &newPred)
-	//fmt.Printf("Updating predecessor...\n")
 	//update predecessor
 	successor := node.query(false, false, 1, nil)
 	if successor.zero() { //TODO: so if you get here, you were probably the first node.
@@ -483,13 +462,11 @@ func (node *ChordNode) notify(newPred Finger) {
 	}
 	//notify applications
 	for _, app := range node.applications {
-		fmt.Printf("Notifying application...\n")
 		app.Notify(newPred.id, node.id, newPred.ipaddr)
 	}
 }
 
 func (node *ChordNode) checkPred() {
-	//fmt.Printf("Checking predecessor.\n")
 	predecessor := node.query(false, false, -1, nil)
 	if predecessor.zero() {
 		return
@@ -498,13 +475,11 @@ func (node *ChordNode) checkPred() {
 	msg := pingMsg()
 	reply, err := node.send(msg, predecessor.ipaddr)
 	if err != nil {
-		fmt.Printf("Node %s could not contact pred. setting pred back to nil.\n", node.ipaddr)
 		predecessor.ipaddr = ""
 		node.query(true, false, -1, &predecessor)
 	}
 
 	if success, err := parsePong(reply); !success || err != nil {
-		fmt.Printf("Node %s could not parse pong. setting pred back to nil.\n", node.ipaddr)
 		predecessor.ipaddr = ""
 		node.query(true, false, -1, &predecessor)
 	}
@@ -518,36 +493,29 @@ func (node *ChordNode) fix(which int) {
 	if which == 0 || which == 1 || successor.zero() {
 		return
 	}
-	fmt.Printf("Fixing finger %d at %s.\n", which, time.Now().String())
 	var targetId [sha256.Size]byte
 	copy(targetId[:sha256.Size], target(node.id, which)[:sha256.Size])
-	//fmt.Printf("Node %s is looking for target %x.\n", node.ipaddr, targetId)
 	newip, err := node.lookup(targetId, successor.ipaddr)
 	if err != nil { //node failed: TODO make more robust
 		checkError(err)
-		fmt.Printf("Fix failed (1).\n")
 		return
 	}
 	if newip == node.ipaddr {
 		checkError(err)
-		fmt.Printf("Fix failed. Thought I was the key.\n")
 		return
 	}
-	//fmt.Printf("Target %x belongs to %s.\n", targetId, newip)
 
 	//find id of node
 	msg := getidMsg()
 	reply, err := node.send(msg, newip)
 	if err != nil {
 		checkError(err)
-		fmt.Printf("Fix failed (3).\n")
 		return
 	}
 
 	newfinger := new(Finger)
 	newfinger.ipaddr = newip
 	newfinger.id, _ = parseId(reply)
-	//fmt.Printf("Node %s updating finger %d: %s.\n", node.ipaddr, which, newfinger.ipaddr)
 	node.query(true, false, which, newfinger)
 
 }
@@ -624,7 +592,6 @@ func target(me [sha256.Size]byte, which int) []byte {
 		for i := diff; i < sha256.Size; i++ {
 			tmp[i] = bytes[i-diff]
 		}
-		fmt.Printf("Padded %x to %x.\n", bytes, tmp)
 		bytes = tmp
 	}
 	return bytes[:sha256.Size]

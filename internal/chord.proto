@@ -1,4 +1,4 @@
-package chord;
+package chordMsgs;
 
 message SendIdMessage {
 	required string id = 1;

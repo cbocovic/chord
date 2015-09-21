@@ -7,6 +7,7 @@ package chord
 
 import (
 	"fmt"
+	"github.com/cbocovic/chord/internal"
 	"github.com/golang/protobuf/proto"
 	"log"
 )
@@ -15,10 +16,10 @@ import (
 //marshalled protocol buffer
 func getfingersMsg() []byte {
 
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["GetFingers"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["GetFingers"])
 	chordMsg.Cmd = &command
 	chorddata, err := proto.Marshal(chordMsg)
 	if err != nil {
@@ -36,15 +37,15 @@ func getfingersMsg() []byte {
 
 func sendfingersMsg(fingers []Finger) []byte {
 
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["GetFingers"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["GetFingers"])
 	chordMsg.Cmd = &command
-	sfMsg := new(SendFingersMessage)
+	sfMsg := new(chordMsgs.SendFingersMessage)
 	for _, finger := range fingers {
 		if !finger.zero() {
-			fingerMsg := new(FingerMessage)
+			fingerMsg := new(chordMsgs.FingerMessage)
 			fingerMsg.Id = proto.String(string(finger.id[:32]))
 			fingerMsg.Address = proto.String(finger.ipaddr)
 			sfMsg.Fingers = append(sfMsg.Fingers, fingerMsg)
@@ -68,10 +69,10 @@ func sendfingersMsg(fingers []Finger) []byte {
 //getidMsg constructs a message to ask a server for its chord id
 func getidMsg() []byte {
 
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["GetId"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["GetId"])
 	chordMsg.Cmd = &command
 	chorddata, err := proto.Marshal(chordMsg)
 	if err != nil {
@@ -90,12 +91,12 @@ func getidMsg() []byte {
 //sendidMsg constructs a message to ask a server for its chord id
 func sendidMsg(id []byte) []byte {
 
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["GetId"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["GetId"])
 	chordMsg.Cmd = &command
-	sidMsg := new(SendIdMessage)
+	sidMsg := new(chordMsgs.SendIdMessage)
 	sidMsg.Id = proto.String(string(id))
 	chordMsg.Sidmsg = sidMsg
 	chorddata, err := proto.Marshal(chordMsg)
@@ -114,10 +115,10 @@ func sendidMsg(id []byte) []byte {
 
 //TODO: rewrite
 func getpredMsg() []byte {
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["GetPred"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["GetPred"])
 	chordMsg.Cmd = &command
 	chorddata, err := proto.Marshal(chordMsg)
 	if err != nil {
@@ -136,13 +137,13 @@ func getpredMsg() []byte {
 
 //TODO: rewrite
 func sendpredMsg(finger Finger) []byte {
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["GetPred"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["GetPred"])
 	chordMsg.Cmd = &command
-	pMsg := new(PredMessage)
-	fingerMsg := new(FingerMessage)
+	pMsg := new(chordMsgs.PredMessage)
+	fingerMsg := new(chordMsgs.FingerMessage)
 	fingerMsg.Id = proto.String(string(finger.id[:32]))
 	fingerMsg.Address = proto.String(finger.ipaddr)
 	pMsg.Pred = fingerMsg
@@ -164,13 +165,13 @@ func sendpredMsg(finger Finger) []byte {
 }
 
 func claimpredMsg(finger Finger) []byte {
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["ClaimPred"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["ClaimPred"])
 	chordMsg.Cmd = &command
-	predMsg := new(PredMessage)
-	fingerMsg := new(FingerMessage)
+	predMsg := new(chordMsgs.PredMessage)
+	fingerMsg := new(chordMsgs.FingerMessage)
 	fingerMsg.Id = proto.String(string(finger.id[:32]))
 	fingerMsg.Address = proto.String(finger.ipaddr)
 	predMsg.Pred = fingerMsg
@@ -194,10 +195,10 @@ func claimpredMsg(finger Finger) []byte {
 //pingMsg constructs a message to ping a server
 func pingMsg() []byte {
 
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["Ping"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["Ping"])
 	chordMsg.Cmd = &command
 	chorddata, err := proto.Marshal(chordMsg)
 	if err != nil {
@@ -216,10 +217,10 @@ func pingMsg() []byte {
 //pongMsg constructs a message to reply to a ping
 func pongMsg() []byte {
 
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["Pong"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["Pong"])
 	chordMsg.Cmd = &command
 	chorddata, err := proto.Marshal(chordMsg)
 	if err != nil {
@@ -236,10 +237,10 @@ func pongMsg() []byte {
 }
 
 func getsuccessorsMsg() []byte {
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
-	chordMsg := new(ChordMessage)
-	command := ChordMessage_Command(ChordMessage_Command_value["GetSucc"])
+	chordMsg := new(chordMsgs.ChordMessage)
+	command := chordMsgs.ChordMessage_Command(chordMsgs.ChordMessage_Command_value["GetSucc"])
 	chordMsg.Cmd = &command
 	chorddata, err := proto.Marshal(chordMsg)
 	if err != nil {
@@ -257,7 +258,7 @@ func getsuccessorsMsg() []byte {
 }
 
 func nullMsg() []byte {
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(1)
 
 	data, err := proto.Marshal(msg)
@@ -272,7 +273,7 @@ func nullMsg() []byte {
 //performs actions based on what the message contains.
 func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 
 	err := proto.Unmarshal(data, msg)
 	checkError(err)
@@ -290,7 +291,7 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 	}
 
 	chorddata := []byte(msg.GetMsg())
-	chordmsg := new(ChordMessage)
+	chordmsg := new(chordMsgs.ChordMessage)
 	err = proto.Unmarshal(chorddata, chordmsg)
 	checkError(err)
 	if err != nil {
@@ -300,11 +301,11 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 
 	cmd := int32(chordmsg.GetCmd())
 	switch {
-	case cmd == ChordMessage_Command_value["Ping"]:
+	case cmd == chordMsgs.ChordMessage_Command_value["Ping"]:
 		c <- pongMsg()
 		return
-	case cmd == ChordMessage_Command_value["GetPred"]:
-		node.request <- Request{false, false, -1}
+	case cmd == chordMsgs.ChordMessage_Command_value["GetPred"]:
+		node.request <- request{false, false, -1}
 		pred := <-node.finger
 		if pred.zero() {
 			c <- nullMsg()
@@ -312,14 +313,14 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 			c <- sendpredMsg(pred) //node.predecessor)
 		}
 		return
-	case cmd == ChordMessage_Command_value["GetId"]:
+	case cmd == chordMsgs.ChordMessage_Command_value["GetId"]:
 		c <- sendidMsg(node.id[:32])
 		return
-	case cmd == ChordMessage_Command_value["GetFingers"]:
+	case cmd == chordMsgs.ChordMessage_Command_value["GetFingers"]:
 		table := make([]Finger, 32*8+1)
 		//fmt.Printf("Fingers of node %s:\n", node.ipaddr)
 		for i := range table {
-			node.request <- Request{false, false, i}
+			node.request <- request{false, false, i}
 			f := <-node.finger
 			//fmt.Printf("\t%s\n", f.String())
 			table[i] = f
@@ -327,7 +328,7 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 
 		c <- sendfingersMsg(table)
 		return
-	case cmd == ChordMessage_Command_value["ClaimPred"]:
+	case cmd == chordMsgs.ChordMessage_Command_value["ClaimPred"]:
 		//extract finger
 		newPred, err := parseFinger(data)
 		checkError(err)
@@ -335,7 +336,7 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 			c <- nullMsg()
 			break
 		}
-		node.request <- Request{false, false, -1}
+		node.request <- request{false, false, -1}
 		pred := <-node.finger
 
 		if pred.zero() || InRange(newPred.id, pred.id, node.id) {
@@ -344,10 +345,10 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 		c <- nullMsg()
 		//update finger table
 		return
-	case cmd == ChordMessage_Command_value["GetSucc"]:
+	case cmd == chordMsgs.ChordMessage_Command_value["GetSucc"]:
 		table := make([]Finger, 32*8)
 		for i := range table {
-			node.request <- Request{false, true, i}
+			node.request <- request{false, true, i}
 			f := <-node.finger
 			table[i] = f
 		}
@@ -363,14 +364,14 @@ func (node *ChordNode) parseMessage(data []byte, c chan []byte) {
 //parseFingers can be called to return a finger table from a received
 //message after a getfingers call.
 func parseFingers(data []byte) (ft []Finger, err error) {
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	err = proto.Unmarshal(data, msg)
 	if msg.GetProto() != 1 {
 		//TODO: return non-nil error
 		return
 	}
 	chorddata := []byte(msg.GetMsg())
-	chordmsg := new(ChordMessage)
+	chordmsg := new(chordMsgs.ChordMessage)
 	err = proto.Unmarshal(chorddata, chordmsg)
 	checkError(err)
 	if err != nil {
@@ -396,7 +397,7 @@ func parseFingers(data []byte) (ft []Finger, err error) {
 }
 
 func parseFinger(data []byte) (f Finger, err error) {
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	err = proto.Unmarshal(data, msg)
 	checkError(err)
 	if err != nil {
@@ -409,7 +410,7 @@ func parseFinger(data []byte) (f Finger, err error) {
 	}
 
 	chorddata := []byte(msg.GetMsg())
-	chordmsg := new(ChordMessage)
+	chordmsg := new(chordMsgs.ChordMessage)
 	err = proto.Unmarshal(chorddata, chordmsg)
 	checkError(err)
 	if err != nil {
@@ -426,7 +427,7 @@ func parseFinger(data []byte) (f Finger, err error) {
 }
 
 func parseId(data []byte) (id [32]byte, err error) {
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	err = proto.Unmarshal(data, msg)
 	if msg.GetProto() != 1 {
 		//TODO: return non-nil error
@@ -434,7 +435,7 @@ func parseId(data []byte) (id [32]byte, err error) {
 	}
 
 	chorddata := []byte(msg.GetMsg())
-	chordmsg := new(ChordMessage)
+	chordmsg := new(chordMsgs.ChordMessage)
 	err = proto.Unmarshal(chorddata, chordmsg)
 	checkError(err)
 	if err != nil {
@@ -454,7 +455,7 @@ func parseId(data []byte) (id [32]byte, err error) {
 
 func parsePong(data []byte) (success bool, err error) {
 
-	msg := new(NetworkMessage)
+	msg := new(chordMsgs.NetworkMessage)
 	err = proto.Unmarshal(data, msg)
 	checkError(err)
 	if err != nil {
@@ -468,7 +469,7 @@ func parsePong(data []byte) (success bool, err error) {
 	}
 
 	chorddata := []byte(msg.GetMsg())
-	chordmsg := new(ChordMessage)
+	chordmsg := new(chordMsgs.ChordMessage)
 	err = proto.Unmarshal(chorddata, chordmsg)
 	checkError(err)
 	if err != nil {
@@ -481,7 +482,7 @@ func parsePong(data []byte) (success bool, err error) {
 	}
 
 	command := int32(chordmsg.GetCmd())
-	if command == ChordMessage_Command_value["Pong"] {
+	if command == chordMsgs.ChordMessage_Command_value["Pong"] {
 		success = true
 	} else {
 		success = false

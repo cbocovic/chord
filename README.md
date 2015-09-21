@@ -1,5 +1,5 @@
 # Chord DHT in Go
-Package chord provides library functions for the Chord DHT, as described by the original authors of the Chord protocol (https://godoc.org/github.com/cbocovic/chord).
+Package chord provides library functions for the Chord DHT, as described by the original authors of the Chord protocol (https://pdos.csail.mit.edu/papers/ton:chord/paper-ton.pdf).
 
 ## Features
 

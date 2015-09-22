@@ -1,9 +1,8 @@
 /* Package chord
- *
- * This package is a collection of structures and functions associated
- * with the Chord distributed lookup protocol.
- */
 
+This package is a collection of structures and functions associated
+with the Chord distributed lookup protocol.
+*/
 package chord
 
 import (
@@ -346,7 +345,7 @@ func (node *ChordNode) query(write bool, succ bool, index int, newf *Finger) Fin
 func (node *ChordNode) maintain() {
 	ctr := 0
 	for {
-		time.Sleep(time.Duration(rand.Uint32()%60)*time.Second + time.Duration(rand.Uint32()%60)*time.Millisecond)
+		time.Sleep(time.Duration(rand.Uint32()%3)*time.Minute + time.Duration(rand.Uint32()%60)*time.Second + time.Duration(rand.Uint32()%60)*time.Millisecond)
 		//stabilize
 		node.stabilize()
 		//check predecessor

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -17,8 +16,8 @@ func Send(msg []byte, addr string) (reply []byte, err error) {
 	//TODO: return error if reply took too long
 
 	if addr == "" {
-		debug.PrintStack()
-		panic("ahhh")
+		err = &PeerError{addr, nil}
+		return nil, err
 	}
 
 	laddr := new(net.TCPAddr)
@@ -62,8 +61,8 @@ func Send(msg []byte, addr string) (reply []byte, err error) {
 //send for a node checks existing open connections
 func (node *ChordNode) send(msg []byte, addr string) (reply []byte, err error) {
 	if addr == "" {
-		debug.PrintStack()
-		panic("ahhh")
+		err = &PeerError{addr, nil}
+		return nil, err
 	}
 
 	conn, ok := node.connections[addr]
